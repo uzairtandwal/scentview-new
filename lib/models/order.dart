@@ -32,7 +32,6 @@ class OrderItem {
   };
 
   factory OrderItem.fromJson(Map<String, dynamic> json) => OrderItem(
-    // .toString() aur double.tryParse dono laga diye hain taake data type ka masla na aaye
     id: json['id']?.toString() ?? '', 
     name: json['name'] as String? ?? 'No Name',
     price: double.tryParse(json['price']?.toString() ?? '0') ?? 0.0,

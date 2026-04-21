@@ -73,7 +73,6 @@ class FirestoreService {
   }
 
   //- - - - - - - - - - - - - - - - - - - -
-  // Future-based (one-time) Read Operations
   //- - - - - - - - - - - - - - - - - - - -
 
   Future<List<Product>> getFeaturedProducts() async {
@@ -177,7 +176,6 @@ class FirestoreService {
   }
 
   //- - - - - - - - - - - - - - - - - - - -
-  // Orders (demo) Operations
   //- - - - - - - - - - - - - - - - - - - -
 
   Stream<List<Order>> getOrdersStream() {

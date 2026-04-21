@@ -1,570 +1,174 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' hide Category;
 import 'package:http/http.dart' as http;
-import 'package:http_parser/http_parser.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:mime/mime.dart';
 import 'package:scentview/models/product_model.dart';
-import 'package:scentview/models/order.dart';
-import 'package:scentview/models/category.dart' as app_category;
+import 'package:scentview/models/app_user.dart';
+import 'package:scentview/models/category.dart';
 import 'package:scentview/models/banner.dart' as model;
-import 'package:flutter/foundation.dart';
-import 'package:connectivity_plus/connectivity_plus.dart'; 
-import 'package:scentview/database/db_helper.dart'; 
-
+import 'package:scentview/models/order.dart';
 import 'package:scentview/utils/url_utils.dart';
+import 'package:scentview/database/db_helper.dart';
 
 class ApiService {
-  final String baseUrl;
+  final String baseUrl = UrlUtils.domainUrl;
   static String? authToken;
-  
-  static void setAuthToken(String? token) {
-    authToken = token;
-    if (kDebugMode) print("🔑 ApiService: Token updated: ${token != null ? 'EXISTS' : 'NULL'}");
-  }
-  
-  static bool _isFcmSynced = false; 
   final DBHelper _dbHelper = DBHelper();
 
-  // Yahan hum domain aur api path ko set kar rahe hain
-  // Agar ye galat ho toh TimeoutException aati hai
-  static const String domainUrl = UrlUtils.domainUrl;
-  
-  ApiService({this.baseUrl = '${UrlUtils.domainUrl}/api/v1'});
+  static void setAuthToken(String? token) { authToken = token; }
+  static String? toAbsoluteUrl(String? path) => UrlUtils.toAbsoluteUrl(path);
 
-  Uri _u(String path) => Uri.parse('$baseUrl$path');
-
-  static String? toAbsoluteUrl(String? relativeUrl) {
-    return UrlUtils.toAbsoluteUrl(relativeUrl);
+  Uri _u(String path) {
+    final uri = Uri.parse('$baseUrl/api/v1$path');
+    if (kDebugMode) debugPrint("🌐 API CALL: $uri");
+    return uri;
   }
 
-  Map<String, String> _headers({bool json = false, bool multipart = false, String? token}) {
-    final h = <String, String>{};
-    h['Accept'] = 'application/json';
-    h['Connection'] = 'Keep-Alive'; 
-
-    if (!multipart) {
-      if (json) h['Content-Type'] = 'application/json';
-    }
-
-    final effectiveToken = token ?? ApiService.authToken;
-    
-    if (effectiveToken != null && effectiveToken.isNotEmpty) {
-      h['Authorization'] = 'Bearer $effectiveToken';
-    }
-    return h;
+  Map<String, String> _headers({bool json = false, String? token}) {
+    final headers = <String, String>{'Accept': 'application/json'};
+    if (json) headers['Content-Type'] = 'application/json';
+    final activeToken = token ?? authToken;
+    if (activeToken != null) headers['Authorization'] = 'Bearer $activeToken';
+    return headers;
   }
 
-  String _parseError(int statusCode, String responseBody) {
+  // ✅ Smart Extractor for Categories and Lists
+  List<dynamic> _extract(dynamic responseBody) {
     try {
-      final body = jsonDecode(responseBody);
-      if (body is Map && body.containsKey('message')) {
-        if (body.containsKey('errors')) {
-           return "${body['message']}: ${body['errors'].toString()}";
+      final decoded = jsonDecode(responseBody);
+      if (decoded is List) return decoded;
+      if (decoded is Map) {
+        if (decoded.containsKey('data')) {
+          if (decoded['data'] is List) return decoded['data'];
+          if (decoded['data'] is Map && decoded['data'].containsKey('data')) return decoded['data']['data'];
+          return [decoded['data']]; // Single item wrapped
         }
-        return body['message'];
       }
-    } catch (_) {}
-    return 'Request failed with status: $statusCode';
+    } catch (e) { if (kDebugMode) debugPrint("❌ JSON Parse Error: $e"); }
+    return [];
   }
 
-  // ================ 🛒 ORDER METHODS ================
-  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> orderData) async {
-    try {
-      final response = await http.post(
-        _u('/orders'),
-        headers: _headers(json: true),
-        body: jsonEncode(orderData),
-      ).timeout(const Duration(seconds: 30));
+  // ================ 🛍️ PRODUCT METHODS ================
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        throw Exception(_parseError(response.statusCode, response.body));
-      }
-    } catch (e) {
-      throw Exception('Failed to place order: $e');
+  Future<List<Product>> fetchProducts({bool forceRefresh = false}) async {
+    try {
+      final response = await http.get(_u('/products'), headers: _headers());
+      final data = _extract(response.body);
+      final products = data.map((json) => Product.fromJson(json)).toList();
+      if (products.isNotEmpty) await _dbHelper.insertProducts(products);
+      return products;
+    } catch (e) { return await _dbHelper.getProducts(); }
+  }
+
+  Future<List<Product>> fetchFeaturedProducts({bool forceRefresh = false}) async {
+    try {
+      final response = await http.get(_u('/products/featured'), headers: _headers());
+      return _extract(response.body).map((j) => Product.fromJson(j)).toList();
+    } catch (e) { return []; }
+  }
+
+  Future<List<Product>> fetchProductsLocal() async => await _dbHelper.getProducts();
+
+  // ================ 📁 CATEGORY METHODS ================
+
+  Future<List<Category>> fetchCategories({bool forceRefresh = false}) async {
+    try {
+      final response = await http.get(_u('/categories'), headers: _headers());
+      final data = _extract(response.body);
+      return data.map((json) => Category.fromJson(json)).toList();
+    } catch (e) { 
+       final local = await _dbHelper.getCategories();
+       return local.map((m) => Category.fromJson(m)).toList();
     }
   }
 
-  Future<void> updateFcmToken(String token) async {
-    if (_isFcmSynced) return; 
-    try {
-      final response = await http.post(
-        _u('/update-fcm-token'), 
-        headers: _headers(json: true),
-        body: jsonEncode({'fcm_token': token}),
-      ).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        _isFcmSynced = true; 
-      }
-    } catch (_) {}
-  }
-
-  // ================ LOCAL DATA METHODS ================
-  Future<List<app_category.Category>> fetchCategoriesLocal() async {
+  Future<List<Category>> fetchCategoriesLocal() async {
     final maps = await _dbHelper.getCategories();
-    return maps.map((e) => app_category.Category.fromJson(e)).toList();
+    return maps.map((m) => Category.fromJson(m)).toList();
   }
 
-  Future<List<model.Banner>> fetchBannersLocal() async {
-    return await _dbHelper.getBanners();
+  // ================ 👑 ADMIN CRUD (FAIL-PROOF) ================
+
+  Future<void> addProduct({required String name, required String description, required String price, required String category, bool isFeatured = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? customerProductName, String? externalImageUrl}) async {
+    final request = http.MultipartRequest('POST', _u('/products/add'));
+    request.headers.addAll(_headers(token: token));
+    request.fields.addAll({'name': name, 'description': description, 'price': price, 'category': category, 'is_featured': isFeatured ? '1' : '0', 'scent_family': scentFamily ?? '', 'brand': brand ?? '', 'size': size ?? '', 'quantity': quantity ?? '100', 'notes_top': notesTop ?? '', 'notes_middle': notesMiddle ?? '', 'notes_base': notesBase ?? '', 'customer_product_name': customerProductName ?? '', 'image_url': externalImageUrl ?? ''});
+    if (imageFile != null) request.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    final resp = await http.Response.fromStream(await request.send());
+    if (resp.statusCode > 299) throw Exception(jsonDecode(resp.body)['message'] ?? 'Add Failed');
   }
 
-  Future<List<Product>> fetchProductsLocal() async {
-    return await _dbHelper.getProducts();
+  Future<void> updateProduct({required dynamic id, required String name, required String description, required String price, required String category, bool isFeatured = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? customerProductName, String? externalImageUrl}) async {
+    final request = http.MultipartRequest('POST', _u('/products/update/$id'));
+    request.headers.addAll(_headers(token: token));
+    request.fields.addAll({'name': name, 'description': description, 'price': price, 'category': category, 'is_featured': isFeatured ? '1' : '0', 'scent_family': scentFamily ?? '', 'brand': brand ?? '', 'size': size ?? '', 'quantity': quantity ?? '100', 'notes_top': notesTop ?? '', 'notes_middle': notesMiddle ?? '', 'notes_base': notesBase ?? '', 'customer_product_name': customerProductName ?? '', 'image_url': externalImageUrl ?? ''});
+    if (imageFile != null) request.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    final resp = await http.Response.fromStream(await request.send());
+    if (resp.statusCode > 299) throw Exception(jsonDecode(resp.body)['message'] ?? 'Update Failed');
   }
 
-  // ================ CATEGORY METHODS ================
-  Future<List<app_category.Category>> fetchCategories() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      return await fetchCategoriesLocal();
-    }
+  Future<void> deleteProduct({required dynamic id, String? token}) async {
+    final response = await http.post(_u('/products/delete/$id'), headers: _headers(token: token));
+    if (response.statusCode > 299) throw Exception('Delete Failed');
+  }
 
+  // ================ 🖼️ OTHER ================
+  Future<List<model.Banner>> fetchBanners({bool forceRefresh = false}) async {
     try {
-      final res = await http.get(_u('/categories'), headers: _headers()).timeout(const Duration(seconds: 30));
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List<dynamic> list = [];
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map) {
-          final data = decoded['data'];
-          list = (data is List) ? data : (data is Map ? data['data'] ?? [] : []);
-        }
-        
-        // Save to local DB
-        await _dbHelper.insertCategories(list.cast<Map<String, dynamic>>());
-        
-        return list.map((e) => app_category.Category.fromJson(e)).toList();
-      }
-      return await fetchCategoriesLocal();
-    } catch (e) {
-      debugPrint("Fetch Categories Error: $e");
-      return await fetchCategoriesLocal();
-    }
+      final response = await http.get(_u('/banners'), headers: _headers());
+      return _extract(response.body).map((j) => model.Banner.fromJson(j)).toList();
+    } catch (e) { return await _dbHelper.getBanners(); }
   }
+  Future<List<model.Banner>> fetchBannersLocal() async => await _dbHelper.getBanners();
 
-  // ================ BANNER METHODS ================
-  Future<List<model.Banner>> fetchBanners() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) return await _dbHelper.getBanners();
-
-    try {
-      final res = await http.get(_u('/banners'), headers: _headers()).timeout(const Duration(seconds: 30));
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List<dynamic> list = [];
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map) {
-          final data = decoded['data'];
-          list = (data is List) ? data : (data is Map ? data['data'] ?? [] : []);
-        }
-        List<model.Banner> banners = list.map((e) => model.Banner.fromJson(e)).toList();
-        await _dbHelper.insertBanners(banners);
-        return banners;
-      }
-      return await _dbHelper.getBanners();
-    } catch (e) {
-      return await _dbHelper.getBanners();
-    }
+  Future<Map<String, dynamic>> login(String email, String password) async {
+    final response = await http.post(_u('/login'), headers: _headers(json: true), body: jsonEncode({'email': email, 'password': password}));
+    if (response.statusCode == 200) return jsonDecode(response.body);
+    throw Exception('Login Failed');
   }
-
-  // ================ PRODUCT METHODS ================
-  Future<List<Product>> fetchProducts({String? query}) async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) return await _dbHelper.getProducts();
-
-    try {
-      var path = '/products';
-      if (query != null && query.isNotEmpty) path += '?q=$query';
-      final res = await http.get(_u(path), headers: _headers()).timeout(const Duration(seconds: 30));
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List<dynamic> productList = [];
-        
-        if (decoded is List) {
-          productList = decoded;
-        } else if (decoded is Map) {
-          final data = decoded['data'];
-          if (data is List) {
-            productList = data;
-          } else if (data is Map && data.containsKey('data')) {
-            productList = data['data'];
-          }
-        }
-// ✅ DEBUG — console mein URL dikhega
-if (productList.isNotEmpty) {
-  debugPrint("🖼️ RAW image_url: ${productList[0]['image_url']}");
-}
-        List<Product> products = productList.map((e) => Product.fromJson(e)).toList();
-        if (query == null || query.isEmpty) await _dbHelper.insertProducts(products);
-        return products;
-      }
-      return await _dbHelper.getProducts();
-    } catch (e) {
-      debugPrint("Fetch Products Error: $e");
-      return await _dbHelper.getProducts();
-    }
+  Future<void> updateFcmToken(String token) async { try { await http.post(_u('/update-fcm-token'), headers: _headers(json: true), body: jsonEncode({'fcm_token': token})); } catch (_) {} }
+  Future<Map<String, dynamic>> placeOrder(Map<String, dynamic> data) async {
+    final res = await http.post(_u('/orders'), headers: _headers(json: true), body: jsonEncode(data));
+    return jsonDecode(res.body);
   }
-
-  Future<List<Product>> fetchSliderProducts() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      List<Product> allProducts = await _dbHelper.getProducts();
-      return allProducts.where((p) => p.isSlider).toList();
-    }
-    try {
-      final res = await http.get(_u('/products?is_slider=1'), headers: _headers()).timeout(const Duration(seconds: 60
-      
-      ));
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List<dynamic> list = [];
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map) {
-          final data = decoded['data'];
-          list = (data is List) ? data : (data is Map ? data['data'] ?? [] : []);
-        }
-        return list.map((e) => Product.fromJson(e)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<List<Product>> fetchFeaturedProducts() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    if (connectivityResult.contains(ConnectivityResult.none)) {
-      List<Product> allProducts = await _dbHelper.getProducts();
-      return allProducts.where((p) => p.isFeatured).toList();
-    }
-    try {
-      final res = await http.get(_u('/products?is_featured=1'), headers: _headers()).timeout(const Duration(seconds: 30));
-      if (res.statusCode == 200) {
-        final decoded = jsonDecode(res.body);
-        List<dynamic> list = [];
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map) {
-          final data = decoded['data'];
-          list = (data is List) ? data : (data is Map ? data['data'] ?? [] : []);
-        }
-        return list.map((e) => Product.fromJson(e)).toList();
-      }
-      return [];
-    } catch (e) {
-      return [];
-    }
-  }
-
-  Future<Product> addProduct({
-    required String name,
-    required String description,
-    required String price,
-    String? salePrice,
-    required String category,
-    required bool isFeatured,
-    bool isSlider = false,
-    String? scentFamily,
-    String? brand,
-    String? size,
-    String? quantity,
-    String? notesTop,
-    String? notesMiddle,
-    String? notesBase,
-    String? badgeText,
-    XFile? imageFile,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/products'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    request.fields.addAll({
-      'name': name,
-      'description': description,
-      'price': price.trim(),
-      'category': category,
-      'is_featured': isFeatured ? '1' : '0',
-      'is_slider': isSlider ? '1' : '0',
-    });
-    if (salePrice != null && salePrice.isNotEmpty) request.fields['sale_price'] = salePrice.trim();
-    if (quantity != null && quantity.isNotEmpty) request.fields['quantity'] = quantity.trim();
-    if (scentFamily != null) request.fields['scent_family'] = scentFamily.trim();
-    if (brand != null) request.fields['brand'] = brand.trim();
-    if (size != null) request.fields['size'] = size.trim();
-    if (notesTop != null) request.fields['notes_top'] = notesTop.trim();
-    if (notesMiddle != null) request.fields['notes_middle'] = notesMiddle.trim();
-    if (notesBase != null) request.fields['notes_base'] = notesBase.trim();
-    if (badgeText != null) request.fields['badge_text'] = badgeText.trim();
-    
-    if (imageFile != null) {
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
-    }
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      return Product.fromJson(decoded['data'] ?? decoded);
-    } else {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<Product> updateProduct({
-    required String id,
-    required String name,
-    required String description,
-    required String price,
-    String? salePrice,
-    required String category,
-    required bool isFeatured,
-    bool isSlider = false,
-    String? scentFamily,
-    String? brand,
-    String? size,
-    String? quantity,
-    String? notesTop,
-    String? notesMiddle,
-    String? notesBase,
-    String? badgeText,
-    XFile? imageFile,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/products/$id'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    
-    request.fields.addAll({
-      'name': name,
-      'description': description,
-      'price': price.trim(),
-      'category': category,
-      'is_featured': isFeatured ? '1' : '0',
-      'is_slider': isSlider ? '1' : '0',
-    });
-    if (salePrice != null && salePrice.isNotEmpty) request.fields['sale_price'] = salePrice.trim();
-    if (quantity != null && quantity.isNotEmpty) request.fields['quantity'] = quantity.trim();
-    if (scentFamily != null) request.fields['scent_family'] = scentFamily.trim();
-    if (brand != null) request.fields['brand'] = brand.trim();
-    if (size != null) request.fields['size'] = size.trim();
-    if (notesTop != null) request.fields['notes_top'] = notesTop.trim();
-    if (notesMiddle != null) request.fields['notes_middle'] = notesMiddle.trim();
-    if (notesBase != null) request.fields['notes_base'] = notesBase.trim();
-    if (badgeText != null) request.fields['badge_text'] = badgeText.trim();
-
-    if (imageFile != null) {
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name, contentType: mimeType != null ? MediaType.parse(mimeType) : null));
-    }
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      return Product.fromJson(decoded['data'] ?? decoded);
-    } else {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<void> deleteProduct({required String id, String? token}) async {
-    await http.delete(_u('/products/$id'), headers: _headers(token: token)).timeout(const Duration(seconds: 30));
-  }
-
-  // ================ BANNER CRUD METHODS ================
-  Future<void> createBanner({
-    required String title,
-    required String targetScreen,
-    required String targetId,
-    required XFile imageFile,
-    int sortOrder = 0,
-    bool isActive = true,
-    String? description,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/banners'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    request.fields.addAll({
-      'title': title,
-      'target_screen': targetScreen,
-      'target_id': targetId,
-      'sort_order': sortOrder.toString(),
-      'is_active': isActive ? '1' : '0',
-    });
-    if (description != null) request.fields['description'] = description;
-
-    final bytes = await imageFile.readAsBytes();
-    final mimeType = lookupMimeType(imageFile.path);
-    request.files.add(http.MultipartFile.fromBytes(
-      'image', 
-      bytes, 
-      filename: imageFile.name, 
-      contentType: mimeType != null ? MediaType.parse(mimeType) : null
-    ));
-
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<void> updateBanner({
-    required String id,
-    required String title,
-    required String targetScreen,
-    required String targetId,
-    XFile? imageFile,
-    int sortOrder = 0,
-    bool isActive = true,
-    String? description,
-    String? currentImageUrl,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/banners/$id'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    
-    request.fields.addAll({
-      'title': title,
-      'target_screen': targetScreen,
-      'target_id': targetId,
-      'sort_order': sortOrder.toString(),
-      'is_active': isActive ? '1' : '0',
-    });
-    if (description != null) request.fields['description'] = description;
-
-    if (imageFile != null) {
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes(
-        'image', 
-        bytes, 
-        filename: imageFile.name, 
-        contentType: mimeType != null ? MediaType.parse(mimeType) : null
-      ));
-    }
-
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode != 200) {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<void> deleteBanner({required String id, String? token}) async {
-    final response = await http.delete(_u('/banners/$id'), headers: _headers(token: token)).timeout(const Duration(seconds: 30));
-    if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  // ================ CATEGORY CRUD METHODS ================
-  Future<void> createCategory({
-    required String name,
-    XFile? imageFile,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/categories'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    request.fields['name'] = name;
-
-    if (imageFile != null) {
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes(
-        'image', 
-        bytes, 
-        filename: imageFile.name, 
-        contentType: mimeType != null ? MediaType.parse(mimeType) : null
-      ));
-    }
-
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode != 201 && response.statusCode != 200) {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<void> updateCategory({
-    required String id,
-    required String name,
-    XFile? imageFile,
-    String? token,
-  }) async {
-    final request = http.MultipartRequest('POST', _u('/categories/$id'));
-    request.headers.addAll(_headers(token: token, multipart: true));
-    
-    request.fields['name'] = name;
-
-    if (imageFile != null) {
-      final bytes = await imageFile.readAsBytes();
-      final mimeType = lookupMimeType(imageFile.path);
-      request.files.add(http.MultipartFile.fromBytes(
-        'image', 
-        bytes, 
-        filename: imageFile.name, 
-        contentType: mimeType != null ? MediaType.parse(mimeType) : null
-      ));
-    }
-
-    final streamedResponse = await request.send().timeout(const Duration(seconds: 30));
-    final response = await http.Response.fromStream(streamedResponse);
-    if (response.statusCode != 200) {
-      throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  Future<void> deleteCategory({required String id, String? token}) async {
-    final response = await http.delete(_u('/categories/$id'), headers: _headers(token: token)).timeout(const Duration(seconds: 30));
-    if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(_parseError(response.statusCode, response.body));
-    }
-  }
-
-  // ================ ADMIN ORDER METHODS ================
   Future<List<Order>> fetchAdminOrders() async {
-    try {
-      final response = await http.get(
-        _u('/admin/orders'),
-        headers: _headers(),
-      ).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode == 200) {
-        final decoded = jsonDecode(response.body);
-        List<dynamic> list = [];
-        if (decoded is List) {
-          list = decoded;
-        } else if (decoded is Map) {
-          list = decoded['data'] ?? [];
-        }
-        return list.map((e) => Order.fromJson(e)).toList();
-      } else {
-        throw Exception(_parseError(response.statusCode, response.body));
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch admin orders: $e');
-    }
+    final res = await http.get(_u('/admin/orders'), headers: _headers());
+    return _extract(res.body).map((j) => Order.fromJson(j)).toList();
   }
-
-  Future<void> updateOrderStatus(String id, String status) async {
-    try {
-      final response = await http.put(
-        _u('/admin/orders/$id/status'),
-        headers: _headers(json: true),
-        body: jsonEncode({'status': status}),
-      ).timeout(const Duration(seconds: 30));
-
-      if (response.statusCode != 200) {
-        throw Exception(_parseError(response.statusCode, response.body));
-      }
-    } catch (e) {
-      throw Exception('Failed to update order status: $e');
-    }
+  Future<void> updateOrderStatus(dynamic id, String s) async => await http.post(_u('/admin/orders/$id/status'), headers: _headers(json: true), body: jsonEncode({'status': s}));
+  Future<void> createCategory({required String name, dynamic imageFile, String? token}) async {
+    final req = http.MultipartRequest('POST', _u('/categories/add'));
+    req.headers.addAll(_headers(token: token));
+    req.fields['name'] = name;
+    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    await req.send();
+  }
+  Future<void> deleteCategory({required dynamic id, String? token}) async => await http.post(_u('/categories/delete/$id'), headers: _headers(token: token));
+  Future<List<dynamic>> fetchSubscribers() async {
+    final res = await http.get(_u('/subscribers'), headers: _headers());
+    return _extract(res.body);
+  }
+  Future<void> deleteSubscriber(dynamic id) async => await http.post(_u('/subscribers/delete/$id'), headers: _headers());
+  Future<void> createBanner({required String title, String? description, String? targetScreen, String? targetId, int? sortOrder, bool isActive = true, dynamic imageFile, String? token}) async {
+    final req = http.MultipartRequest('POST', _u('/banners/add'));
+    req.headers.addAll(_headers(token: token));
+    req.fields.addAll({'title': title, 'is_active': isActive ? '1' : '0'});
+    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    await req.send();
+  }
+  Future<void> deleteBanner({required dynamic id, String? token}) async => await http.post(_u('/banners/delete/$id'), headers: _headers(token: token));
+  Future<void> updateBanner({required dynamic id, required String title, String? description, String? targetScreen, String? targetId, int? sortOrder, bool isActive = true, String? currentImageUrl, dynamic imageFile, String? token}) async {
+    final req = http.MultipartRequest('POST', _u('/banners/update/$id'));
+    req.headers.addAll(_headers(token: token));
+    req.fields.addAll({'title': title, 'is_active': isActive ? '1' : '0'});
+    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    await req.send();
+  }
+  Future<void> updateCategory({required dynamic id, required String name, dynamic imageFile, String? token}) async {
+    final req = http.MultipartRequest('POST', _u('/categories/update/$id'));
+    req.headers.addAll(_headers(token: token));
+    req.fields['name'] = name;
+    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    await req.send();
   }
 }

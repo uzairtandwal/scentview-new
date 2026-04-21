@@ -52,7 +52,6 @@ class OrdersService with ChangeNotifier {
     }
   }
 
-  // 2. Order ko Laravel API par bhejne ka function (IDEMPOTENT)
   Future<Order?> placeOrder(Map<String, dynamic> orderData, String idempotencyKey) async {
     if (kDebugMode) print('------------------------------------------');
     if (kDebugMode) print('🔥 ORDERS_SERVICE: placeOrder STARTING!');

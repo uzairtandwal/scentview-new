@@ -60,7 +60,6 @@ void main() async {
 Future<void> _setupFCM() async {
   FirebaseMessaging messaging = FirebaseMessaging.instance;
 
-  // 1. Permission (iOS/Android 13+ ke liye)
   NotificationSettings settings = await messaging.requestPermission(
     alert: true,
     badge: true,

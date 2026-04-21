@@ -29,7 +29,6 @@ class ProductShimmer extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Image Placeholder (flex 7 — matches ProductCard) ──
             Expanded(
               flex: isCompact ? 6 : 7,
               child: Container(
@@ -66,7 +65,6 @@ class ProductShimmer extends StatelessWidget {
                       ),
                     ),
 
-                    // Price placeholder (shorter)
                     Container(
                       height: isCompact ? 10 : 12,
                       width: 70,

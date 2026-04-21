@@ -340,7 +340,7 @@ class _CompareSection extends StatelessWidget {
 class _CompareRowData {
   final String label;
   final List<String> values;
-  final int highlightIndex; // which column to highlight (-1 = none)
+  final int highlightIndex;
   final bool highlightGood; // green = good, red = bad
 
   const _CompareRowData({

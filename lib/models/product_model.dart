@@ -73,13 +73,20 @@ class Product {
       }
     }
 
+    String? rawImg = json['image_url']?.toString();
+    String finalImg = "";
+    
+    if (rawImg != null && rawImg.isNotEmpty && rawImg != "null") {
+      finalImg = rawImg.startsWith('http') ? rawImg : (UrlUtils.toAbsoluteUrl(rawImg) ?? '');
+    }
+
     return Product(
       id: json['id'],
       name: json['name']?.toString() ?? '',
       description: json['description']?.toString(),
       price: double.tryParse(json['price']?.toString() ?? '0.0') ?? 0.0,
       salePrice: json['sale_price'] != null ? double.tryParse(json['sale_price'].toString()) : null,
-      imageUrl: UrlUtils.toAbsoluteUrl(json['image_url']?.toString() ?? '') ?? '',
+      imageUrl: finalImg,
       images: imagesList,
       isFeatured: json['is_featured'] == 1 || json['is_featured'] == true,
       isSlider: json['is_slider'] == 1 || json['is_slider'] == true,

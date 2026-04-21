@@ -12,8 +12,9 @@ import 'widgets/product_shimmer.dart';
 class ShopScreen extends StatefulWidget {
   static const routeName = '/shop';
   final String searchQuery;
+  final String initialCategory;
 
-  const ShopScreen({super.key, this.searchQuery = ''});
+  const ShopScreen({super.key, this.searchQuery = '', this.initialCategory = 'All'});
 
   @override
   State<ShopScreen> createState() => _ShopScreenState();
@@ -28,7 +29,7 @@ class _ShopScreenState extends State<ShopScreen> {
   bool _hasError = false;
 
   // ── Filter state ───────────────────────────────────────────────────────────
-  String _selectedCategory = 'All';
+  late String _selectedCategory;
   double _maxPrice         = 100000;
   String _sortBy           = 'Newest';
   String _currentSearch    = '';
@@ -37,6 +38,7 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedCategory = widget.initialCategory;
     _currentSearch = widget.searchQuery;
     _searchCtrl.text = widget.searchQuery;
     _fetchProducts();
@@ -49,12 +51,17 @@ class _ShopScreenState extends State<ShopScreen> {
   @override
   void didUpdateWidget(ShopScreen old) {
     super.didUpdateWidget(old);
+    bool changed = false;
     if (old.searchQuery != widget.searchQuery) {
-      setState(() {
-        _currentSearch = widget.searchQuery;
-        _searchCtrl.text = widget.searchQuery;
-      });
+      _currentSearch = widget.searchQuery;
+      _searchCtrl.text = widget.searchQuery;
+      changed = true;
     }
+    if (old.initialCategory != widget.initialCategory && widget.initialCategory != _selectedCategory) {
+      _selectedCategory = widget.initialCategory;
+      changed = true;
+    }
+    if (changed) setState(() {});
   }
 
   @override
@@ -64,13 +71,13 @@ class _ShopScreenState extends State<ShopScreen> {
   }
 
   // ── Data ───────────────────────────────────────────────────────────────────
-  Future<void> _fetchProducts() async {
+  Future<void> _fetchProducts({bool forceRefresh = false}) async {
     setState(() {
       _isLoading = true;
       _hasError  = false;
     });
     try {
-      final products = await _api.fetchProducts();
+      final products = await _api.fetchProducts(forceRefresh: forceRefresh);
       if (!mounted) return;
       setState(() {
         _allProducts = products;
@@ -87,20 +94,49 @@ class _ShopScreenState extends State<ShopScreen> {
 
   // ── Filtered & sorted products ─────────────────────────────────────────────
   List<Product> get _displayed {
-    var list = _allProducts.where((p) {
-      final matchSearch = p.name
-          .toLowerCase()
-          .contains(_currentSearch.trim().toLowerCase()) || 
-          (p.category?.toLowerCase().contains(_currentSearch.trim().toLowerCase()) ?? false);
-      
-      final matchCat = _selectedCategory == 'All' ||
-          p.category?.toLowerCase() == _selectedCategory.toLowerCase();
-      
-      final matchPrice = (p.price) <= _maxPrice;
-      
-      return matchSearch && matchCat && matchPrice;
-    }).toList();
+    final q = _currentSearch.trim().toLowerCase();
+    
+    if (q.isEmpty) {
+      var list = _allProducts.where((p) {
+        final matchCat = _selectedCategory == 'All' ||
+            p.category?.toLowerCase() == _selectedCategory.toLowerCase();
+        final matchPrice = (p.price) <= _maxPrice;
+        return matchCat && matchPrice;
+      }).toList();
+      _sortList(list);
+      return list;
+    } else {
+      // 1. Find all possible matches for the word
+      final matches = _allProducts.where((p) {
+        return p.name.toLowerCase().contains(q) || 
+               (p.description?.toLowerCase().contains(q) ?? false) ||
+               (p.category?.toLowerCase().contains(q) ?? false);
+      }).toList();
 
+      final topMatches = matches.take(7).toList();
+      final matchedIds = topMatches.map((m) => m.id).toSet();
+      
+      // We take products that are NOT in topMatches to avoid duplicates
+      final potentialExtras = _allProducts.where((p) => !matchedIds.contains(p.id)).toList();
+      
+      int needed = 10 - topMatches.length;
+      final topExtra = potentialExtras.take(needed).toList();
+      
+      var finalResults = [...topMatches, ...topExtra];
+      
+      // Final guard: If for some reason we have less than 10, take anything
+      if (finalResults.length < 10 && _allProducts.length >= 10) {
+         final currentIds = finalResults.map((r) => r.id).toSet();
+         final fallback = _allProducts.where((p) => !currentIds.contains(p.id)).take(10 - finalResults.length);
+         finalResults.addAll(fallback);
+      }
+
+      _sortList(finalResults);
+      return finalResults;
+    }
+  }
+
+  void _sortList(List<Product> list) {
     switch (_sortBy) {
       case 'Price: Low to High':
         list.sort((a, b) => (a.price).compareTo(b.price));
@@ -112,7 +148,6 @@ class _ShopScreenState extends State<ShopScreen> {
         list.sort((a, b) => a.name.compareTo(b.name));
         break;
     }
-    return list;
   }
 
   // ── Filter sheet ───────────────────────────────────────────────────────────
@@ -142,53 +177,46 @@ class _ShopScreenState extends State<ShopScreen> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surfaceContainerLowest,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _openFilterSheet,
-        backgroundColor: primary,
-        child: const Icon(Iconsax.filter_edit, color: Colors.white),
-      ),
       body: Column(
         children: [
           // ── Results count ──────────────────────────────
           if (!_isLoading)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      '${products.length} fragrances found',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        color: primary,
-                      ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 40,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: ['All', 'Male', 'Female', 'Unisex'].map((cat) {
+                        final isSelected = _selectedCategory == cat;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: FilterChip(
+                            label: Text(cat, style: TextStyle(
+                              color: isSelected ? Colors.white : primary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            )),
+                            selected: isSelected,
+                            onSelected: (val) {
+                              setState(() => _selectedCategory = cat);
+                            },
+                            backgroundColor: Colors.white,
+                            selectedColor: primary,
+                            checkmarkColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              side: BorderSide(color: isSelected ? primary : primary.withOpacity(0.2)),
+                            ),
+                            showCheckmark: false,
+                          ),
+                        );
+                      }).toList(),
                     ),
                   ),
-                  const Spacer(),
-                  if (_selectedCategory != 'All' || _sortBy != 'Newest' || _currentSearch.isNotEmpty)
-                    GestureDetector(
-                      onTap: () => setState(() {
-                        _selectedCategory = 'All';
-                        _maxPrice         = 100000;
-                        _sortBy           = 'Newest';
-                        _currentSearch    = '';
-                        _searchCtrl.clear();
-                      }),
-                      child: Text(
-                        'Reset Filters',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: theme.colorScheme.error,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
@@ -240,13 +268,12 @@ class _ShopScreenState extends State<ShopScreen> {
                                       childCount: products.length,
                                     ),
                                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
+                                      crossAxisCount: 1, // UPDATED: 1 product per row
                                       crossAxisSpacing: 14,
                                       mainAxisSpacing: 14,
-                                      childAspectRatio: 0.68,
+                                      childAspectRatio: 0.95, // UPDATED: Match Home Page
                                     ),
-                                  ),
-                                ),
+                                  ),                                ),
                               ],
                             ),
                           ),

@@ -187,7 +187,6 @@ Phone: +92 300 1234567
 
   void _toggleDarkMode(bool value) {
     setState(() => _darkModeEnabled = value);
-    // context.read<ThemeProvider>().toggleTheme(value);
     _showSnackBar(
       value ? 'Dark mode enabled' : 'Light mode enabled',
       Colors.indigo,

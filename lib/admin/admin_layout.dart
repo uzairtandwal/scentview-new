@@ -63,14 +63,6 @@ class _AdminLayoutState extends State<AdminLayout> {
                 Navigator.pushReplacementNamed(context, '/admin/categories');
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.image),
-              title: const Text('Banners'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushReplacementNamed(context, '/admin/banners');
-              },
-            ),
           ],
         ),
       ),

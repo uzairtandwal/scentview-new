@@ -37,7 +37,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
 
   // Infinite scroll: start from middle multiplier
   static const int _multiplier = 1000;
-  int _realIndex = 0; // actual banner index (0 to banners.length-1)
+  int _realIndex = 0;
 
   bool get _canAutoPlay =>
       widget.autoPlay && widget.banners.length > 1;

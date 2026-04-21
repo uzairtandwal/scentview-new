@@ -167,6 +167,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: null,
         onPressed: () => _showAddressSheet(),
         icon: const Icon(Iconsax.add),
         label: const Text(

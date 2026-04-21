@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 
 // ── Replace with your actual Product model/service ──
-// import '../models/product.dart';
-// import '../services/product_service.dart';
 
 class SearchScreen extends StatefulWidget {
   static const routeName = '/search';

@@ -10,6 +10,13 @@ class CartService with ChangeNotifier {
   String? _appliedCouponCode;
 
   List<Product> get items => _items;
+  List<Product> get uniqueItems {
+    final Map<dynamic, Product> unique = {};
+    for (var item in _items) {
+      unique[item.id] = item;
+    }
+    return unique.values.toList();
+  }
   List<Product> get savedItems => _savedItems;
 
   // ✅ 1. Subtotal (Sale price use karte huye total)
@@ -52,8 +59,10 @@ class CartService with ChangeNotifier {
 
   // ================= CART OPERATIONS =================
 
-  void add(Product product) {
-    _items.add(product);
+  void add(Product product, {int quantity = 1}) {
+    for (int i = 0; i < quantity; i++) {
+      _items.add(product);
+    }
     notifyListeners();
   }
 

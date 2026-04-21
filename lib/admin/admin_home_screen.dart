@@ -13,6 +13,7 @@ import 'package:scentview/admin/product_form_screen.dart';
 import 'package:scentview/admin/add_edit_banner_screen.dart';
 import 'package:scentview/admin/add_edit_category_screen.dart';
 import 'package:scentview/admin/orders_dashboard.dart';
+import 'package:scentview/admin/subscribers_screen.dart';
 
 class AdminHomeScreen extends StatefulWidget {
   static const String routeName = '/admin/dashboard';
@@ -26,6 +27,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   final ApiService _apiService = ApiService();
   late Future<List<Product>> _productsFuture;
   late Future<List<app_category.Category>> _categoriesFuture;
+  late Future<List<dynamic>> _subscribersFuture;
 
   static const Color _bg       = Color(0xFFF7F8FC);
   static const Color _white    = Colors.white;
@@ -33,13 +35,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   static const Color _textDark = Color(0xFF1A1D2E);
   static const Color _textSub  = Color(0xFF9094A6);
 
-  // ── Dummy Orders (jab tak real DB na aaye) ─────────────────────
+  // ── Dummy Orders ─────────────────────
   final List<Map<String, dynamic>> _dummyOrders = [
-    {'id': '#1001', 'user': 'Ahmed Khan',    'product': 'Rose Perfume',   'rate': '\$45.00', 'address': 'Lahore, Punjab',   'status': 'Pending'},
-    {'id': '#1002', 'user': 'Sara Ali',      'product': 'Oud Musk',       'rate': '\$78.00', 'address': 'Karachi, Sindh',   'status': 'Completed'},
-    {'id': '#1003', 'user': 'Bilal Raza',    'product': 'Jasmine Essence','rate': '\$32.00', 'address': 'Islamabad',        'status': 'Pending'},
-    {'id': '#1004', 'user': 'Hina Shafiq',   'product': 'Amber Wood',     'rate': '\$95.00', 'address': 'Faisalabad',       'status': 'Cancelled'},
-    {'id': '#1005', 'user': 'Usman Tariq',   'product': 'Blue Ocean',     'rate': '\$55.00', 'address': 'Multan, Punjab',   'status': 'Completed'},
+    {'id': '#1001', 'user': 'Ahmed Khan',    'product': 'Rose Perfume',   'rate': 'Rs 4500', 'address': 'Lahore, Punjab',   'status': 'Pending'},
+    {'id': '#1002', 'user': 'Sara Ali',      'product': 'Oud Musk',       'rate': 'Rs 7800', 'address': 'Karachi, Sindh',   'status': 'Completed'},
+    {'id': '#1003', 'user': 'Bilal Raza',    'product': 'Jasmine Essence','rate': 'Rs 3200', 'address': 'Islamabad',        'status': 'Pending'},
+    {'id': '#1004', 'user': 'Hina Shafiq',   'product': 'Amber Wood',     'rate': 'Rs 9500', 'address': 'Faisalabad',       'status': 'Cancelled'},
+    {'id': '#1005', 'user': 'Usman Tariq',   'product': 'Blue Ocean',     'rate': 'Rs 5500', 'address': 'Multan, Punjab',   'status': 'Completed'},
   ];
 
   @override
@@ -50,8 +52,9 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
 
   void _loadData() {
     setState(() {
-      _productsFuture   = _apiService.fetchProducts();
-      _categoriesFuture = _apiService.fetchCategories();
+      _productsFuture    = _apiService.fetchProducts();
+      _categoriesFuture  = _apiService.fetchCategories();
+      _subscribersFuture = _apiService.fetchSubscribers();
       Provider.of<OrdersService>(context, listen: false).fetchOrders();
     });
   }
@@ -86,31 +89,13 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   Widget build(BuildContext context) {
     return Consumer<OrdersService>(
       builder: (context, ordersService, _) {
-
-        // ── Stats ──────────────────────────────────────────────────
-        final stats = [
-          _StatItem(title: 'Products',   future: _productsFuture,   icon: Icons.shopping_bag_rounded,   iconBg: const Color(0xFFE8F0FE), iconColor: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductListScreen())),
-          _StatItem(title: 'Categories', future: _categoriesFuture, icon: Icons.category_rounded,        iconBg: const Color(0xFFE6F9F0), iconColor: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
-          _StatItem(title: 'Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFFFF3E0), iconColor: const Color(0xFFF39C12), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
-          _StatItem(title: 'Revenue',    value: 'Rs ${ordersService.orders.fold<double>(0, (s, o) => s + o.total).toStringAsFixed(0)}', icon: Icons.attach_money_rounded,    iconBg: const Color(0xFFFCE4EC), iconColor: _primary, onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
-          _StatItem(title: 'Pending',    value: ordersService.orders.where((o) => o.status.toLowerCase() == 'pending').length.toString(), icon: Icons.pending_actions_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
-        ];
-
-        // ── Quick Actions (4 items — 2x2 grid) ─────────────────────
-        final actions = [
-          _ActionItem(title: 'Add Product',   subtitle: 'Naya product',  icon: Icons.add_box_rounded,            color: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductFormScreen())),
-          _ActionItem(title: 'View Orders',   subtitle: 'Manage karein', icon: Icons.receipt_long_rounded,       color: const Color(0xFF27AE60), onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
-          _ActionItem(title: 'Add Banner',    subtitle: 'Upload karein', icon: Icons.add_photo_alternate_rounded,color: _primary,                onTap: () => _nav(context, const AddEditBannerScreen())),
-          _ActionItem(title: 'Reports',       subtitle: 'Analytics',     icon: Icons.bar_chart_rounded,          color: const Color(0xFFF39C12), onTap: () => _showComingSoon(context, 'Analytics Reports')),
-        ];
-
         return Scaffold(
           backgroundColor: _bg,
           appBar: AppBar(
             backgroundColor: _white,
             elevation: 0,
             centerTitle: false,
-            title: const Text('Dashboard', style: TextStyle(color: Color(0xFF1A1D2E), fontWeight: FontWeight.w800, fontSize: 20)),
+            title: const Text('Admin Panel', style: TextStyle(color: Color(0xFF1A1D2E), fontWeight: FontWeight.w800, fontSize: 20)),
             actions: [
               TextButton.icon(
                 onPressed: () => _logoutAndVisitShop(context),
@@ -124,69 +109,118 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           body: AdminLayout(
             child: RefreshIndicator(
               color: _primary,
-              onRefresh: () async => _loadData(),
-              child: CustomScrollView(
-                slivers: [
+              onRefresh: () async {
+                _loadData();
+              },
+              child: FutureBuilder(
+                future: Future.wait([_productsFuture, _categoriesFuture, _subscribersFuture]),
+                builder: (context, AsyncSnapshot<List<dynamic>> snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: _primary));
+                  }
+                  
+                  final List<Product> products = snapshot.data?[0] ?? [];
+                  final List<app_category.Category> categories = snapshot.data?[1] ?? [];
+                  final List<dynamic> subscribers = snapshot.data?[2] ?? [];
+                  
+                  // Calculations
+                  double totalInventoryValue = 0;
+                  int lowStockItems = 0;
+                  int manProducts = 0;
+                  int womanProducts = 0;
+                  int unisexProducts = 0;
 
-                  // ── Welcome Banner ───────────────────────────────
-                  SliverToBoxAdapter(child: _buildHeader()),
+                  for (var p in products) {
+                    totalInventoryValue += (p.price * p.quantity);
+                    if (p.quantity <= 5) lowStockItems++;
+                    
+                    String cat = (p.category ?? '').toLowerCase();
+                    if (cat.contains('man') || cat.contains('male')) manProducts++;
+                    else if (cat.contains('woman') || cat.contains('female')) womanProducts++;
+                    else if (cat.contains('unisex')) unisexProducts++;
+                  }
 
-                  // ── Stats Grid ───────────────────────────────────
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        // FIX 1: childAspectRatio badha diya — overflow band
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.35,
+                  final stats = [
+                    _StatItem(title: 'Total Products',   value: products.length.toString(), icon: Icons.shopping_bag_rounded,   iconBg: const Color(0xFFE8F0FE), iconColor: const Color(0xFF4A6CF7), onTap: () => _nav(context, const ProductListScreen())),
+                    _StatItem(title: 'Inventory Value', value: 'Rs ${totalInventoryValue.toStringAsFixed(0)}', icon: Icons.account_balance_wallet_rounded, iconBg: const Color(0xFFFFF3E0), iconColor: const Color(0xFFF39C12), onTap: () {}),
+                    _StatItem(title: 'Low Stock',      value: lowStockItems.toString(), icon: Icons.warning_amber_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () {}),
+                    _StatItem(title: 'Categories',      value: categories.length.toString(), icon: Icons.category_rounded,        iconBg: const Color(0xFFE6F9F0), iconColor: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
+                    _StatItem(title: 'Newsletter',      value: subscribers.length.toString(), icon: Icons.mark_email_read_rounded, iconBg: const Color(0xFFF3E5F5), iconColor: Colors.purple, onTap: () => _nav(context, const SubscribersScreen())),
+                    _StatItem(title: 'Total Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFE1F5FE), iconColor: Colors.lightBlue, onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
+                  ];
+
+                  return CustomScrollView(
+                    slivers: [
+                      const SliverToBoxAdapter(child: SizedBox(height: 20)),
+
+                      // ── Stats Grid ───────────────────────────────────
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                        sliver: SliverGrid(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 15,
+                            mainAxisSpacing: 15,
+                            childAspectRatio: 1.0, // Ratio 1.0 means Square cards - more height
+                          ),
+                          delegate: SliverChildBuilderDelegate(
+                            (context, i) => _buildStatCard(stats[i]),
+                            childCount: stats.length,
+                          ),
+                        ),
                       ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => _buildStatCard(stats[i]),
-                        childCount: stats.length,
+
+                      // ── Product by Categories ──────────────────────────
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                          child: const Text('Products by Category', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // ── Quick Actions Title ──────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                      child: const Text('Quick Actions', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
-                    ),
-                  ),
-
-                  // FIX 2: Quick Actions — 2x2 Grid (2 cards per row)
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
-                    sliver: SliverGrid(
-                      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: 1.6,
+                      SliverToBoxAdapter(
+                        child: _buildCategoryBreakdown(manProducts, womanProducts, unisexProducts),
                       ),
-                      delegate: SliverChildBuilderDelegate(
-                        (context, i) => _buildActionCard(actions[i]),
-                        childCount: actions.length,
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+                      // ── Recently Added Products ────────────────────────
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Recently Added', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
+                              TextButton(
+                                onPressed: () => _nav(context, const ProductListScreen()),
+                                child: const Text('View All', style: TextStyle(color: _primary, fontWeight: FontWeight.w600)),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
 
-                  // ── Recent Orders Title ──────────────────────────
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
-                      child: const Text('Recent Orders', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
-                    ),
-                  ),
+                      SliverToBoxAdapter(
+                        child: _buildRecentProductsList(products),
+                      ),
 
-                  // FIX 3: Proper Table for Orders
-                  SliverToBoxAdapter(child: _buildOrdersTable()),
+                      const SliverToBoxAdapter(child: SizedBox(height: 24)),
 
-                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
-                ],
+                      // ── Recent Orders ──────────────────────────
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                          child: const Text('Recent Orders', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E))),
+                        ),
+                      ),
+
+                      SliverToBoxAdapter(child: _buildOrdersTable()),
+
+                      const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                    ],
+                  );
+                },
               ),
             ),
           ),
@@ -195,7 +229,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ─── Welcome Banner ────────────────────────────────────────────
+  // ─── Header ────────────────────────────────────────────
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
@@ -211,71 +245,100 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Welcome back! 👋', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
+                const Text('Hello Admin! 👋', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 4),
-                const Text('Admin Dashboard', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
+                const Text('ScentView Overview', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
                 const SizedBox(height: 6),
-                Text('Aaj ka overview neeche dekhein', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
+                Text('Manage your inventory and orders easily.', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
               ],
             ),
           ),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.admin_panel_settings_rounded, color: Colors.white, size: 32),
+            child: const Icon(Icons.insights_rounded, color: Colors.white, size: 32),
           ),
         ],
       ),
     );
   }
 
-  // ─── Stat Card (FIX 1: overflow band kiya) ────────────────────
+  // ─── Stat Card ────────────────────
   Widget _buildStatCard(_StatItem stat) {
-    Widget valueWidget = stat.future != null
-        ? FutureBuilder<List<dynamic>>(
-            future: stat.future,
-            builder: (_, snap) => Text(
-              snap.hasData ? snap.data!.length.toString() : (snap.hasError ? '–' : '...'),
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D2E)),
-              overflow: TextOverflow.ellipsis,
-            ),
-          )
-        : Text(
-            stat.value ?? '0',
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1A1D2E)),
-            overflow: TextOverflow.ellipsis,
-          );
-
     return GestureDetector(
       onTap: stat.onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: stat.iconColor.withOpacity(0.12),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            )
+          ],
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Stack(
           children: [
-            // Icon badge
-            Container(
-              padding: const EdgeInsets.all(7),
-              decoration: BoxDecoration(color: stat.iconBg, borderRadius: BorderRadius.circular(10)),
-              child: Icon(stat.icon, color: stat.iconColor, size: 18),
+            // Decorative background circle
+            Positioned(
+              right: -10,
+              top: -10,
+              child: Container(
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: stat.iconColor.withOpacity(0.05),
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
-            // Value + title — flex se overflow nahi hoga
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center, // Content stays together in center
               children: [
-                valueWidget,
-                const SizedBox(height: 2),
+                // Icon Header
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: stat.iconColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(stat.icon, color: stat.iconColor, size: 20),
+                ),
+                const SizedBox(height: 12),
                 Text(
-                  stat.title,
-                  style: const TextStyle(color: Color(0xFF9094A6), fontSize: 11),
+                  stat.title.toUpperCase(),
+                  style: TextStyle(
+                    color: _textSub,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.8,
+                  ),
                   overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 2),
+                // Value
+                Text(
+                  stat.value ?? '0',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: _textDark,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 8),
+                // Indicator Bar
+                Container(
+                  height: 3,
+                  width: 30,
+                  decoration: BoxDecoration(
+                    color: stat.iconColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ],
             ),
@@ -285,52 +348,78 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
     );
   }
 
-  // ─── Quick Action Card (FIX 2: 2x2 grid style) ────────────────
-  Widget _buildActionCard(_ActionItem action) {
-    return GestureDetector(
-      onTap: action.onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
-        ),
-        child: Row(
-          children: [
-            // Icon
-            Container(
-              padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(color: action.color.withOpacity(0.12), borderRadius: BorderRadius.circular(12)),
-              child: Icon(action.icon, color: action.color, size: 22),
-            ),
-            const SizedBox(width: 12),
-            // Text
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(action.title,   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1A1D2E)), overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(action.subtitle,style: const TextStyle(fontSize: 11, color: Color(0xFF9094A6)),                              overflow: TextOverflow.ellipsis),
-                ],
-              ),
-            ),
-          ],
-        ),
+  // ─── Category Breakdown ────────────────────
+  Widget _buildCategoryBreakdown(int man, int woman, int unisex) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
+        children: [
+          _buildBreakdownItem('Men', man, const Color(0xFF4A6CF7)),
+          _buildBreakdownItem('Women', woman, _primary),
+          _buildBreakdownItem('Unisex', unisex, const Color(0xFF27AE60)),
+        ],
       ),
     );
   }
 
-  // ─── Orders Table (FIX 3: proper table) ───────────────────────
+  Widget _buildBreakdownItem(String label, int count, Color color) {
+    return Column(
+      children: [
+        Text(count.toString(), style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: color)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12, color: _textSub, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
+  // ─── Recent Products ────────────────────
+  Widget _buildRecentProductsList(List<Product> products) {
+    final recent = products.reversed.take(4).toList();
+    if (recent.isEmpty) return const SizedBox.shrink();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: _white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: recent.length,
+        separatorBuilder: (_, __) => const Divider(height: 1, indent: 70),
+        itemBuilder: (context, i) {
+          final p = recent[i];
+          return ListTile(
+            leading: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(p.imageUrl, width: 45, height: 45, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(color: _bg, child: const Icon(Icons.image_not_supported, size: 20))),
+            ),
+            title: Text(p.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+            subtitle: Text(p.category ?? 'No Category', style: const TextStyle(fontSize: 11)),
+            trailing: Text('Rs ${p.price.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w700, color: _primary)),
+          );
+        },
+      ),
+    );
+  }
+
+  // ─── Orders Table ───────────────────────
   Widget _buildOrdersTable() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
         color: _white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(16),

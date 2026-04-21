@@ -17,6 +17,7 @@ import 'package:scentview/ui/registration_screen.dart';
 import 'package:scentview/ui/splash_screen.dart';
 import 'package:scentview/ui/profile_screen.dart';
 import 'package:scentview/ui/search_results_screen.dart';
+import 'package:scentview/theme/app_theme.dart';
 
 class ScentViewApp extends StatelessWidget {
   const ScentViewApp({super.key});
@@ -26,11 +27,7 @@ class ScentViewApp extends StatelessWidget {
     return MaterialApp(
       title: 'ScentView',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        useMaterial3: true,
-      ),
+      theme: AppTheme.theme,
       home: const AuthGate(),
       routes: {
         MainAppScreen.routeName: (context) => const MainAppScreen(),
@@ -82,39 +79,27 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-  bool _showSplash = true;
+  // HIDDEN: Bypassing splash for direct home access
+  final bool _showSplash = false; 
 
   @override
   void initState() {
     super.initState();
-    // Start login check as soon as app starts
     _checkLogin();
   }
 
   Future<void> _checkLogin() async {
-    // Only call tryAutoLogin ONCE at startup
     await Provider.of<AuthService>(context, listen: false).tryAutoLogin();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_showSplash) {
-      return ScentViewNeonSplash(
-        onFinished: () {
-          setState(() {
-            _showSplash = false;
-          });
-        },
-      );
-    }
+    // HIDDEN: Logic kept but bypassed to show MainAppScreen directly
+    
 
-    return Consumer<AuthService>(
-      builder: (context, auth, _) {
-        if (auth.isAuthenticated && auth.currentUser?.role == 'admin') {
-          return const AdminHomeScreen();
-        }
-        return const MainAppScreen();
-      },
-    );
+    // HIDDEN: Bypassing Auth check to show MainAppScreen directly
+    return const MainAppScreen();
+
+    
   }
 }

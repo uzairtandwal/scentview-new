@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
-import '../../services/cart_service.dart';
-// import '../../widgets/app_logo.dart'; // 👈 Isay hata dein (Duplicate hai)
+import 'package:scentview/theme/app_theme.dart';
 import 'app_logo.dart';
-import '../cart_screen.dart';
-import '../profile_screen.dart';
 import '../search_results_screen.dart';
 
 class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
@@ -24,78 +20,44 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
     this.onMenuTap,
     this.onRefresh,
     this.onSearchChanged,
+    this.onSubmitted, // NEW: added onSubmitted
     this.gradientColors,
     this.iconColor,
   });
+
+  final Function(String)? onSubmitted; // NEW: field added
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final onPrimary = iconColor ?? theme.colorScheme.onPrimary;
+    final onPrimary = Colors.black;
 
-    final List<Color> colors = gradientColors ??
-        [
-          primary,
-          Color.lerp(primary, Colors.black, 0.15) ?? primary,
-        ];
-
-    // ✅ Status bar icons white on gradient
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.light,
+      value: SystemUiOverlayStyle.dark,
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: colors,
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: colors.first.withValues(alpha: 0.35),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: AppTheme.borderColor, width: 1)),
         ),
         child: SafeArea(
           bottom: false,
           child: SizedBox(
             height: kToolbarHeight,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
               child: Row(
                 children: [
-                  // ── 1. MENU BUTTON ──────────────────────────────
-                  Builder(
-                    builder: (menuContext) => _AppBarButton(
-                      icon: Icons.menu_rounded,
-                      iconColor: onPrimary,
-                      onTap: onMenuTap ?? () => Scaffold.of(menuContext).openDrawer(),
-                    ),
-                  ),
-
-                  const SizedBox(width: 6),
-
-                  // ── 2. REFRESH BUTTON ───────────────────────────
-                  _AppBarButton(
-                    icon: Icons.refresh_rounded,
-                    iconColor: onPrimary,
-                    onTap: onRefresh,
-                  ),
-
+                  const AppLogo(size: 32),
                   const SizedBox(width: 8),
-
-                  // ── 3. SEARCH BAR ───────────────────────────────
                   if (showSearch)
                     Expanded(
                       child: _SearchBar(
-                        hintText: hintText ?? 'Search products...',
+                        hintText: hintText ?? 'SEARCH...',
                         onChanged: onSearchChanged,
-                        onSubmitted: (query) {
+                        onSubmitted: onSubmitted ?? (query) {
+                          // Default fallback
                           if (query.trim().isNotEmpty) {
                             Navigator.pushNamed(
                               context,
@@ -105,27 +67,20 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
                           }
                         },
                       ),
-                    ),
-
+                    )
+                  else
+                    const Expanded(child: Center(child: Text('SCENTVIEW', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 2)))),
                   const SizedBox(width: 8),
-
-                  // ── 4. ACTION BUTTONS ───────────────────────────
-                  Consumer<CartService>(
-                    builder: (_, cart, __) => _AppBarButton(
-                      icon: Icons.shopping_cart_outlined,
+                  Builder(
+                    builder: (menuContext) => _AppBarButton(
+                      icon: Icons.menu_outlined,
                       iconColor: onPrimary,
-                      badgeCount: cart.itemCount,
-                      onTap: () =>
-                          Navigator.pushNamed(context, CartScreen.routeName),
+                      onTap: onMenuTap ?? () => Scaffold.of(menuContext).openDrawer(),
                     ),
                   ),
-                  const SizedBox(width: 6),
-                  _AppBarButton(
-                    icon: Icons.person_outline_rounded,
-                    iconColor: onPrimary,
-                    onTap: () =>
-                        Navigator.pushNamed(context, ProfileScreen.routeName),
-                  ),
+                  const SizedBox(width: 4),
+                  // HIDDEN: Profile button hidden for now
+                  
                 ],
               ),
             ),
@@ -136,7 +91,6 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   }
 }
 
-// ─── Search Bar ───────────────────────────────────────────────────────────────
 class _SearchBar extends StatelessWidget {
   final String hintText;
   final Function(String)? onChanged;
@@ -150,47 +104,35 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
     return Container(
-      height: 40,
+      height: 38,
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: const Color(0xFFF9F9F9),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
       ),
       child: Center(
         child: TextField(
           onChanged: onChanged,
           onSubmitted: onSubmitted,
           textAlignVertical: TextAlignVertical.center,
-          style: const TextStyle(
-            fontSize: 14,
-            color: Colors.black87,
-            fontWeight: FontWeight.w400,
-          ),
+          style: AppTheme.bodySans.copyWith(fontSize: 12, color: Colors.black),
           decoration: InputDecoration(
             hintText: hintText,
-            hintStyle: TextStyle(
-              color: Colors.grey.shade500,
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
+            hintStyle: AppTheme.bodySans.copyWith(
+              color: Colors.grey,
+              fontSize: 11,
+              letterSpacing: 1,
             ),
             border: InputBorder.none,
-            prefixIcon: Icon(
-              Icons.search_rounded,
-              color: primary,
-              size: 18,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            prefixIcon: const Icon(
+              Icons.search_outlined,
+              color: Colors.black,
+              size: 16,
             ),
             isDense: true,
-            contentPadding: const EdgeInsets.only(top: 0), // Fix alignment
+            contentPadding: const EdgeInsets.only(top: 0),
           ),
         ),
       ),
@@ -198,7 +140,6 @@ class _SearchBar extends StatelessWidget {
   }
 }
 
-// ─── AppBar Button (consistent across all icons) ──────────────────────────────
 class _AppBarButton extends StatelessWidget {
   final IconData icon;
   final Color iconColor;
@@ -217,47 +158,32 @@ class _AppBarButton extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // ── Button ──
-        Material(
-          color: iconColor.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(10),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(10),
-            splashColor: iconColor.withValues(alpha: 0.2),
-            highlightColor: iconColor.withValues(alpha: 0.1),
-            child: SizedBox(
-              width: 40,
-              height: 40,
-              child: Icon(icon, color: iconColor, size: 20),
-            ),
+        InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 36,
+            height: 36,
+            child: Icon(icon, color: iconColor, size: 22),
           ),
         ),
-
-        // ── Badge ──
         if (badgeCount > 0)
           Positioned(
-            top: -4,
-            right: -4,
+            top: 2,
+            right: 2,
             child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error,
+              padding: const EdgeInsets.all(1),
+              decoration: const BoxDecoration(
+                color: Colors.black,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: Theme.of(context).colorScheme.primary,
-                  width: 1.5,
-                ),
               ),
-              constraints: const BoxConstraints(minWidth: 17, minHeight: 17),
+              constraints: const BoxConstraints(minWidth: 14, minHeight: 14),
               child: Text(
-                badgeCount > 99 ? '99+' : '$badgeCount',
+                '$badgeCount',
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 9,
+                  fontSize: 8,
                   fontWeight: FontWeight.bold,
-                  height: 1,
                 ),
               ),
             ),

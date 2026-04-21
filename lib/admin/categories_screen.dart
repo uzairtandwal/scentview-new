@@ -103,7 +103,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
             ),
             const SizedBox(width: 12),
 
-            // Text Section (FIXED OVERFLOW)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -151,7 +150,6 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
     );
   }
 
-  // --- Delete Dialog (FIXED TOKEN) ---
   Future<void> _showDeleteConfirmationDialog(BuildContext context, Category category) async {
     return showDialog(
       context: context,

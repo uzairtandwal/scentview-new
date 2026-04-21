@@ -80,7 +80,6 @@ class _ScentViewNeonSplashState extends State<ScentViewNeonSplash> with TickerPr
   }
 }
 
-// Painter aur NeonText classes same rahengi (jo aapne pehle bheji thin)
 class _LineRingPainter extends CustomPainter {
   final Color color; final int lineCount; final double lineLength; final double lineWidth; final double radius; final double startAngle;
   _LineRingPainter({required this.color, required this.lineCount, required this.lineLength, required this.lineWidth, required this.radius, required this.startAngle});

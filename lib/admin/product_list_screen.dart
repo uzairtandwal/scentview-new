@@ -92,6 +92,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             Container(
               margin: const EdgeInsets.only(right: 8),
               child: FloatingActionButton.small(
+                heroTag: null,
                 onPressed: () {
                   Navigator.push(
                     context,
@@ -119,6 +120,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
         ),
         floatingActionButton: !isLargeScreen
             ? FloatingActionButton.extended(
+                heroTag: null,
                 onPressed: () {
                   Navigator.push(
                     context,

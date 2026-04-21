@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
+import 'package:scentview/theme/app_theme.dart';
 
 import '../models/product_model.dart';
 import '../services/api_service.dart';
@@ -11,42 +12,56 @@ import '../admin/admin_home_screen.dart';
 import 'cart_screen.dart';
 import 'home_screen.dart';
 import 'product_detail_screen.dart';
-import 'profile_screen.dart';
+import 'login_screen.dart'; // Import LoginScreen
 import 'shop_screen.dart';
 import 'widgets/custom_app_bar.dart';
 
 class MainAppScreen extends StatefulWidget {
   static const routeName = '/main-app';
-  const MainAppScreen({super.key});
+  final int initialIndex;
+  final String initialCategory;
+  const MainAppScreen({super.key, this.initialIndex = 0, this.initialCategory = 'All'});
 
   @override
   State<MainAppScreen> createState() => _MainAppScreenState();
 }
 
 class _MainAppScreenState extends State<MainAppScreen> {
-  int _selectedIndex = 0;
-  final PageController _pageController = PageController();
+  late int _selectedIndex;
+  late String _currentCategory;
+  late final PageController _pageController;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   DateTime? _lastBackPressTime;
   String _searchQuery = '';
   final ApiService _api = ApiService();
   bool _hasShownSalePopup = false;
 
-  // ── Nav items config ──────────────────────────────────────────────────────
+  // UPDATED: Added Login item
   static const _navItems = [
     _NavItem(label: 'Home',    icon: Iconsax.home,          activeIcon: Iconsax.home_15),
     _NavItem(label: 'Shop',    icon: Iconsax.shop,           activeIcon: Iconsax.shop5),
     _NavItem(label: 'Cart',    icon: Iconsax.shopping_cart,  activeIcon: Iconsax.shopping_cart5),
-    _NavItem(label: 'Profile', icon: Iconsax.user,           activeIcon: Iconsax.user5),
+    _NavItem(label: 'Login',   icon: Iconsax.login,          activeIcon: Iconsax.login_1),
   ];
 
   @override
   void initState() {
     super.initState();
+    _selectedIndex = widget.initialIndex;
+    _currentCategory = widget.initialCategory;
+    _pageController = PageController(initialPage: _selectedIndex);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is int) _navigateTo(args);
     });
+  }
+
+  @override
+  void didUpdateWidget(MainAppScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialIndex != widget.initialIndex || oldWidget.initialCategory != widget.initialCategory) {
+      _navigateTo(widget.initialIndex, category: widget.initialCategory);
+    }
   }
 
   @override
@@ -55,52 +70,42 @@ class _MainAppScreenState extends State<MainAppScreen> {
     super.dispose();
   }
 
-  // ── Navigation ────────────────────────────────────────────────────────────
-  void _navigateTo(int index) {
+  void _navigateTo(int index, {String? category}) {
+    if (category != null) {
+      setState(() => _currentCategory = category);
+    }
     if (_selectedIndex == index) return;
     setState(() => _selectedIndex = index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeInOut,
-    );
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
-  // ── Refresh Logic ─────────────────────────────────────────────────────────
   Future<void> _handleGlobalRefresh() async {
     _hasShownSalePopup = false;
-    setState(() {}); // Trigger rebuild of children
+    setState(() {}); 
     
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Refreshing data...'),
         duration: Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: AppTheme.primaryColor,
       ),
     );
 
-    // Fetch products to show sale popup
     try {
       final products = await _api.fetchProducts();
-      if (products.isNotEmpty) {
-        _showSalePopupIfNeeded(products);
-      }
+      
     } catch (_) {}
   }
 
   void _showSalePopupIfNeeded(List<Product> products) {
-    if (_hasShownSalePopup) return;
-    Future.delayed(const Duration(seconds: 1), () {
-      if (!mounted || products.isEmpty || _hasShownSalePopup) return;
-      final saleProducts = products
-          .where((p) =>
-              p.salePrice != null && p.salePrice! > 0 && p.salePrice! < p.price)
-          .toList();
-      if (saleProducts.isEmpty) return;
-      
-      _hasShownSalePopup = true;
-      _showSaleDialog(saleProducts.first, products);
-    });
+    
   }
 
   void _showSaleDialog(Product product, List<Product> allProducts) {
@@ -111,7 +116,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Sale',
-      barrierColor: Colors.black.withOpacity(0.65),
+      barrierColor: AppTheme.primaryColor.withOpacity(0.8),
       transitionDuration: const Duration(milliseconds: 350),
       transitionBuilder: (_, anim, __, child) => FadeTransition(
         opacity: anim,
@@ -122,7 +127,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
           child: child,
         ),
       ),
-      pageBuilder: (ctx, _, __) => SaleDialog( // Assuming SaleDialog is accessible or I'll move it
+      pageBuilder: (ctx, _, __) => SaleDialog(
         product: product,
         discount: discount,
         onViewDeal: () {
@@ -141,70 +146,59 @@ class _MainAppScreenState extends State<MainAppScreen> {
     );
   }
 
-  // ── Back press — double tap to exit ──────────────────────────────────────
   bool _handleBackPress() {
-    // Not on home tab → go home
     if (_selectedIndex != 0) {
       _navigateTo(0);
-      return true; // handled
+      return true;
     }
 
-    // On home tab → double tap to exit
     final now = DateTime.now();
     final isSecondPress = _lastBackPressTime != null &&
         now.difference(_lastBackPressTime!) <= const Duration(seconds: 2);
 
-    if (isSecondPress) return false; // allow exit
+    if (isSecondPress) return false;
 
     _lastBackPressTime = now;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('Press back again to exit'),
         behavior: SnackBarBehavior.floating,
+        backgroundColor: AppTheme.primaryColor,
         duration: const Duration(seconds: 2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
-    return true; // handled — don't exit yet
+    return true;
   }
 
-  // ── AppBar ────────────────────────────────────────────────────────────────
   PreferredSizeWidget _buildAppBar() {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
-    List<Color> gradientColors;
-    switch (_selectedIndex) {
-      case 2: // Cart
-        gradientColors = [const Color(0xFF059669), const Color(0xFF064E3B)];
-        break;
-      case 3: // Profile
-        gradientColors = [const Color(0xFF3B82F6), const Color(0xFF8B5CF6), const Color(0xFFEC4899)];
-        break;
-      default: // Home & Shop
-        gradientColors = [primary, Color.lerp(primary, Colors.black, 0.15) ?? primary];
-    }
-
     return CustomAppBar(
       showSearch: _selectedIndex == 1 || _selectedIndex == 0,
       hintText: _selectedIndex == 0 ? 'Search products...' : 'Search fragrances...',
       onRefresh: _handleGlobalRefresh,
-      gradientColors: gradientColors,
+      gradientColors: const [AppTheme.primaryColor, AppTheme.secondaryColor],
       onSearchChanged: (_selectedIndex == 0 || _selectedIndex == 1)
           ? (val) => setState(() => _searchQuery = val)
           : null,
+      onSubmitted: (val) {
+        if (_selectedIndex == 0 || _selectedIndex == 1) {
+          setState(() => _searchQuery = val);
+        } else {
+          // If on other pages, maybe jump to Shop?
+          _navigateTo(1);
+          setState(() => _searchQuery = val);
+        }
+      },
     );
   }
 
-  // ── Build ─────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    // Pages — rebuilt only when needed
     final pages = [
       HomeScreen(searchQuery: _searchQuery),
-      ShopScreen(searchQuery: _searchQuery),
+      ShopScreen(searchQuery: _searchQuery, initialCategory: _currentCategory),
       const CartScreen(),
-      const ProfileScreen(),
+      const LoginScreen(), // ADDED: LoginScreen added to pages
     ];
 
     return PopScope(
@@ -218,8 +212,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
         drawer: _buildDrawer(),
         body: PageView(
           controller: _pageController,
-          // ✅ Disable swipe — prevents accidental page changes
-          physics: const NeverScrollableScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           onPageChanged: (i) => setState(() => _selectedIndex = i),
           children: pages,
         ),
@@ -233,28 +226,28 @@ class _MainAppScreenState extends State<MainAppScreen> {
   }
 
   Widget _buildDrawer() {
-    final theme = Theme.of(context);
     final user = Provider.of<AuthService>(context).currentUser;
 
     return Drawer(
+      backgroundColor: Colors.white,
       child: Column(
         children: [
           UserAccountsDrawerHeader(
-            accountName: Text(user?.name ?? 'Guest'),
-            accountEmail: Text(user?.email ?? 'Login for full access'),
+            accountName: Text(user?.name ?? 'ScentView Guest', style: const TextStyle(color: Colors.white)),
+            accountEmail: Text(user?.email ?? 'Welcome to Luxury', style: const TextStyle(color: Colors.white70)),
             currentAccountPicture: CircleAvatar(
               backgroundColor: Colors.white,
               child: Text(
-                user?.name?[0].toUpperCase() ?? 'G',
-                style: TextStyle(fontSize: 24, color: theme.colorScheme.primary),
+                user?.name?[0].toUpperCase() ?? 'S',
+                style: const TextStyle(fontSize: 24, color: AppTheme.primaryColor),
               ),
             ),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.primary,
+            decoration: const BoxDecoration(
+              color: AppTheme.primaryColor,
             ),
           ),
           ListTile(
-            leading: const Icon(Iconsax.home),
+            leading: const Icon(Iconsax.home, color: AppTheme.secondaryColor),
             title: const Text('Home'),
             onTap: () {
               Navigator.pop(context);
@@ -262,7 +255,7 @@ class _MainAppScreenState extends State<MainAppScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Iconsax.shop),
+            leading: const Icon(Iconsax.shop, color: AppTheme.secondaryColor),
             title: const Text('Shop'),
             onTap: () {
               Navigator.pop(context);
@@ -270,26 +263,27 @@ class _MainAppScreenState extends State<MainAppScreen> {
             },
           ),
           ListTile(
-            leading: const Icon(Iconsax.shopping_cart),
+            leading: const Icon(Iconsax.shopping_cart, color: AppTheme.secondaryColor),
             title: const Text('My Cart'),
             onTap: () {
               Navigator.pop(context);
               _navigateTo(2);
             },
           ),
+          // ADDED: Login item added to Drawer
           ListTile(
-            leading: const Icon(Iconsax.user),
-            title: const Text('Profile'),
+            leading: const Icon(Iconsax.login, color: AppTheme.secondaryColor),
+            title: const Text('Login'),
             onTap: () {
               Navigator.pop(context);
               _navigateTo(3);
             },
           ),
-          const Divider(),
+          const Divider(color: AppTheme.secondaryColor),
           if (user?.role == 'admin')
             ListTile(
-              leading: const Icon(Iconsax.setting_2, color: Colors.purple),
-              title: const Text('Admin Panel', style: TextStyle(color: Colors.purple)),
+              leading: const Icon(Iconsax.setting_2, color: AppTheme.primaryColor),
+              title: const Text('Admin Panel', style: TextStyle(color: AppTheme.primaryColor)),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.pushNamed(context, AdminHomeScreen.routeName);
@@ -301,8 +295,6 @@ class _MainAppScreenState extends State<MainAppScreen> {
   }
 }
 
-// ─── Sale Dialog (Internal for MainAppScreen) ─────────────────────────────────
-// Copied from HomeScreen for global use
 class SaleDialog extends StatefulWidget {
   final Product product;
   final int discount;
@@ -342,10 +334,7 @@ class _SaleDialogState extends State<SaleDialog>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.sizeOf(context);
-    const fireRed = Color(0xFFE53935);
-    const fireOrange = Color(0xFFFF6D00);
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -353,9 +342,10 @@ class _SaleDialogState extends State<SaleDialog>
       insetPadding: EdgeInsets.symmetric(horizontal: size.width * 0.06, vertical: 48),
       child: Container(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(28),
-          boxShadow: [BoxShadow(color: fireRed.withOpacity(0.3), blurRadius: 48, offset: const Offset(0, 20))],
+          border: Border.all(color: AppTheme.secondaryColor.withOpacity(0.2)),
+          boxShadow: [BoxShadow(color: AppTheme.primaryColor.withOpacity(0.1), blurRadius: 48, offset: const Offset(0, 20))],
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
@@ -364,7 +354,9 @@ class _SaleDialogState extends State<SaleDialog>
             children: [
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 30, 16, 14),
-                decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFB71C1C), Color(0xFFE53935), Color(0xFFFF6D00)])),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(colors: [AppTheme.primaryColor, AppTheme.secondaryColor])
+                ),
                 child: Row(
                   children: [
                     const Text('🔥', style: TextStyle(fontSize: 24)),
@@ -380,18 +372,18 @@ class _SaleDialogState extends State<SaleDialog>
                   children: [
                     Container(
                       width: 80, height: 80,
-                      decoration: BoxDecoration(color: fireRed.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                      child: Image.network(widget.product.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Iconsax.shop, color: fireRed)),
+                      decoration: BoxDecoration(color: AppTheme.secondaryColor.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Image.network(widget.product.imageUrl, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Iconsax.shop, color: AppTheme.primaryColor)),
                     ),
                     const SizedBox(width: 16),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(widget.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text(widget.product.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryColor)),
                           const SizedBox(height: 4),
-                          Text('Rs ${widget.product.price.toStringAsFixed(0)}', style: const TextStyle(decoration: TextDecoration.lineThrough, color: Colors.grey, fontSize: 12)),
-                          Text('Rs ${widget.product.salePrice!.toStringAsFixed(0)}', style: const TextStyle(color: fireRed, fontWeight: FontWeight.bold, fontSize: 20)),
+                          Text('Rs ${widget.product.price.toStringAsFixed(0)}', style: const TextStyle(decoration: TextDecoration.lineThrough, color: AppTheme.secondaryColor, fontSize: 12)),
+                          Text('Rs ${widget.product.salePrice!.toStringAsFixed(0)}', style: const TextStyle(color: AppTheme.primaryColor, fontWeight: FontWeight.bold, fontSize: 20)),
                         ],
                       ),
                     ),
@@ -405,7 +397,7 @@ class _SaleDialogState extends State<SaleDialog>
                   child: ElevatedButton(
                     onPressed: widget.onViewDeal,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: fireRed, foregroundColor: Colors.white,
+                      backgroundColor: AppTheme.primaryColor, foregroundColor: Colors.white,
                       minimumSize: const Size(double.infinity, 50),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
@@ -421,7 +413,6 @@ class _SaleDialogState extends State<SaleDialog>
   }
 }
 
-// ─── Nav Item Model ───────────────────────────────────────────────────────────
 class _NavItem {
   final String label;
   final IconData icon;
@@ -434,7 +425,6 @@ class _NavItem {
   });
 }
 
-// ─── Bottom Navigation Bar ────────────────────────────────────────────────────
 class _BottomNav extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
@@ -448,41 +438,37 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Consumer<CartService>(
       builder: (_, cart, __) {
         return NavigationBar(
           selectedIndex: selectedIndex,
           onDestinationSelected: onTap,
+          backgroundColor: Colors.white,
+          indicatorColor: AppTheme.primaryColor.withOpacity(0.1),
           labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-          animationDuration: const Duration(milliseconds: 300),
           destinations: navItems.asMap().entries.map((entry) {
             final i    = entry.key;
             final item = entry.value;
 
-            // Cart tab — show badge
             if (i == 2) {
               return NavigationDestination(
                 icon: _CartIcon(
                   icon: item.icon,
                   count: cart.itemCount,
                   isActive: false,
-                  theme: theme,
                 ),
                 selectedIcon: _CartIcon(
                   icon: item.activeIcon,
                   count: cart.itemCount,
                   isActive: true,
-                  theme: theme,
                 ),
                 label: item.label,
               );
             }
 
             return NavigationDestination(
-              icon: Icon(item.icon),
-              selectedIcon: Icon(item.activeIcon),
+              icon: Icon(item.icon, color: AppTheme.secondaryColor),
+              selectedIcon: Icon(item.activeIcon, color: AppTheme.primaryColor),
               label: item.label,
             );
           }).toList(),
@@ -492,18 +478,15 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-// ─── Cart Icon with Badge ─────────────────────────────────────────────────────
 class _CartIcon extends StatelessWidget {
   final IconData icon;
   final int count;
   final bool isActive;
-  final ThemeData theme;
 
   const _CartIcon({
     required this.icon,
     required this.count,
     required this.isActive,
-    required this.theme,
   });
 
   @override
@@ -511,7 +494,7 @@ class _CartIcon extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Icon(icon),
+        Icon(icon, color: isActive ? AppTheme.primaryColor : AppTheme.secondaryColor),
         if (count > 0)
           Positioned(
             top: -6,
@@ -519,10 +502,10 @@ class _CartIcon extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(2),
               decoration: BoxDecoration(
-                color: theme.colorScheme.error,
+                color: AppTheme.primaryColor,
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: theme.colorScheme.surface,
+                  color: Colors.white,
                   width: 1.5,
                 ),
               ),

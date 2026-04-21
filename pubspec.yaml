@@ -63,6 +63,7 @@ flutter:
   uses-material-design: true
 
   assets:
+    - assets/
     - assets/images/
     - assets/homepage images/
     - assets/logo-name/
@@ -71,9 +72,7 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: assets/logo-name/logo1.png
-  adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: assets/logo-name/logo1.png
+  image_path: assets/logo.png.png
   min_sdk_android: 21
   web:
     generate: false
@@ -81,12 +80,12 @@ flutter_launcher_icons:
 flutter_native_splash:
   color: "#FFFFFF"
   color_dark: "#000000"
-  image: assets/logo-name/logo1.png
-  image_dark: assets/logo-name/logo1.png
+  image: assets/logo.png.png
+  image_dark: assets/logo.png.png
   android_12:
     color: "#FFFFFF"
     color_dark: "#000000"
-    image: assets/logo-name/logo1.png
+    image: assets/logo.png.png
     icon_background_color: "#FFFFFF"
     icon_background_color_dark: "#000000"
   android: true
