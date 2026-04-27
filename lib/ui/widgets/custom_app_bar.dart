@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
 import 'package:scentview/theme/app_theme.dart';
 import 'app_logo.dart';
 import '../search_results_screen.dart';
@@ -46,10 +48,15 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
           child: SizedBox(
             height: kToolbarHeight,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 8),
               child: Row(
                 children: [
-                  const AppLogo(size: 32),
+                  Builder(
+                    builder: (context) {
+                      bool isDesktop = kIsWeb || Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+                      return AppLogo(size: isDesktop ? 40 : 50);
+                    },
+                  ),
                   const SizedBox(width: 8),
                   if (showSearch)
                     Expanded(

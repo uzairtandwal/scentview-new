@@ -36,9 +36,26 @@ android {
 
     buildTypes {
         release {
+            // ✅ Enable code minification and resource shrinking
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
+            // Note: Using debug signing for now as per original config
             signingConfig = signingConfigs.getByName("debug")
+            
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("com.google.android.play:core:1.10.3")
+    }
+    exclude(group = "com.google.android.play", module = "core-common")
 }
 
 flutter {
@@ -46,6 +63,7 @@ flutter {
 }
 
 dependencies {
-    // ✅ Ye line aapka error khatam karegi
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.3")
+
+    implementation("com.google.android.play:core:1.10.3")  // ✅ ADD THIS
 }

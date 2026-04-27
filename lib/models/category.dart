@@ -41,4 +41,13 @@ class Category {
       'description': description
     };
   }
+
+  Map<String, dynamic> toDbMap() {
+    return {
+      'id': id,
+      'name': name,
+      'slug': slug,
+      'image_url': imageUrl,
+    };
+  }
 }

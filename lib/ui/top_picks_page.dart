@@ -322,7 +322,6 @@ class _TopPicksPageState extends State<TopPicksPage> {
                                       (_, i) => ProductCard(
                                         product: products[i],
                                         isCompact: false,
-                                        showFavorite: true,
                                         showQuickAdd: true,
                                         onTap: () => Navigator.push(
                                           context,

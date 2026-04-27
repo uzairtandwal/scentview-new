@@ -63,8 +63,15 @@ class ApiService {
   Future<List<Product>> fetchFeaturedProducts({bool forceRefresh = false}) async {
     try {
       final response = await http.get(_u('/products/featured'), headers: _headers());
-      return _extract(response.body).map((j) => Product.fromJson(j)).toList();
-    } catch (e) { return []; }
+      final data = _extract(response.body);
+      final products = data.map((j) => Product.fromJson(j)).toList();
+      // Since they are featured, they should already be in products table if we fetch all products,
+      // but let's just return what we got or empty if failed.
+      return products;
+    } catch (e) { 
+      final all = await _dbHelper.getProducts();
+      return all.where((p) => p.isFeatured).toList();
+    }
   }
 
   Future<List<Product>> fetchProductsLocal() async => await _dbHelper.getProducts();
@@ -75,7 +82,11 @@ class ApiService {
     try {
       final response = await http.get(_u('/categories'), headers: _headers());
       final data = _extract(response.body);
-      return data.map((json) => Category.fromJson(json)).toList();
+      final categories = data.map((json) => Category.fromJson(json)).toList();
+      if (categories.isNotEmpty) {
+        await _dbHelper.insertCategories(categories.map((c) => c.toDbMap()).toList());
+      }
+      return categories;
     } catch (e) { 
        final local = await _dbHelper.getCategories();
        return local.map((m) => Category.fromJson(m)).toList();
@@ -89,20 +100,112 @@ class ApiService {
 
   // ================ 👑 ADMIN CRUD (FAIL-PROOF) ================
 
-  Future<void> addProduct({required String name, required String description, required String price, required String category, bool isFeatured = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? customerProductName, String? externalImageUrl}) async {
+  Future<void> addProduct({required String name, required String description, required String price, required String category, bool isFeatured = false, bool isSlider = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? externalImageUrl, String? price100ml, String? quantity100ml, dynamic imageFile100ml, String? customerProductName, List<dynamic>? additionalImages, List<dynamic>? images50ml, List<dynamic>? images100ml, String? variants}) async {
     final request = http.MultipartRequest('POST', _u('/products/add'));
     request.headers.addAll(_headers(token: token));
-    request.fields.addAll({'name': name, 'description': description, 'price': price, 'category': category, 'is_featured': isFeatured ? '1' : '0', 'scent_family': scentFamily ?? '', 'brand': brand ?? '', 'size': size ?? '', 'quantity': quantity ?? '100', 'notes_top': notesTop ?? '', 'notes_middle': notesMiddle ?? '', 'notes_base': notesBase ?? '', 'customer_product_name': customerProductName ?? '', 'image_url': externalImageUrl ?? ''});
-    if (imageFile != null) request.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    request.fields.addAll({
+      'name': name,
+      'description': description,
+      'price': price,
+      'category': category,
+      'is_featured': isFeatured ? '1' : '0',
+      'is_slider': isSlider ? '1' : '0',
+      'scent_family': scentFamily ?? '',
+      'brand': brand ?? '',
+      'size': size ?? '',
+      'quantity': quantity ?? '100',
+      'notes_top': notesTop ?? '',
+      'notes_middle': notesMiddle ?? '',
+      'notes_base': notesBase ?? '',
+      'image_url': externalImageUrl ?? '',
+      'price_100ml': price100ml ?? '',
+      'quantity_100ml': quantity100ml ?? '',
+      'customer_product_name': customerProductName ?? ''
+    });
+    
+    if (variants != null) request.fields['variants'] = variants;
+
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      request.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
+
+    if (images50ml != null && images50ml.isNotEmpty) {
+      for (var img in images50ml) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('images_50ml[]', bytes, filename: img.name));
+      }
+    }
+
+    if (images100ml != null && images100ml.isNotEmpty) {
+      for (var img in images100ml) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('images_100ml[]', bytes, filename: img.name));
+      }
+    }
+
+    if (additionalImages != null && additionalImages.isNotEmpty) {
+      for (var img in additionalImages) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('additional_images[]', bytes, filename: img.name));
+      }
+    }
+    
     final resp = await http.Response.fromStream(await request.send());
     if (resp.statusCode > 299) throw Exception(jsonDecode(resp.body)['message'] ?? 'Add Failed');
   }
 
-  Future<void> updateProduct({required dynamic id, required String name, required String description, required String price, required String category, bool isFeatured = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? customerProductName, String? externalImageUrl}) async {
+  Future<void> updateProduct({required dynamic id, required String name, required String description, required String price, required String category, bool isFeatured = false, bool isSlider = false, String? scentFamily, String? brand, String? size, String? quantity, String? notesTop, String? notesMiddle, String? notesBase, dynamic imageFile, String? token, String? externalImageUrl, String? price100ml, String? quantity100ml, dynamic imageFile100ml, String? customerProductName, List<dynamic>? additionalImages, List<dynamic>? images50ml, List<dynamic>? images100ml, String? variants}) async {
     final request = http.MultipartRequest('POST', _u('/products/update/$id'));
     request.headers.addAll(_headers(token: token));
-    request.fields.addAll({'name': name, 'description': description, 'price': price, 'category': category, 'is_featured': isFeatured ? '1' : '0', 'scent_family': scentFamily ?? '', 'brand': brand ?? '', 'size': size ?? '', 'quantity': quantity ?? '100', 'notes_top': notesTop ?? '', 'notes_middle': notesMiddle ?? '', 'notes_base': notesBase ?? '', 'customer_product_name': customerProductName ?? '', 'image_url': externalImageUrl ?? ''});
-    if (imageFile != null) request.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    request.fields.addAll({
+      'name': name,
+      'description': description,
+      'price': price,
+      'category': category,
+      'is_featured': isFeatured ? '1' : '0',
+      'is_slider': isSlider ? '1' : '0',
+      'scent_family': scentFamily ?? '',
+      'brand': brand ?? '',
+      'size': size ?? '',
+      'quantity': quantity ?? '100',
+      'notes_top': notesTop ?? '',
+      'notes_middle': notesMiddle ?? '',
+      'notes_base': notesBase ?? '',
+      'image_url': externalImageUrl ?? '',
+      'price_100ml': price100ml ?? '',
+      'quantity_100ml': quantity100ml ?? '',
+      'customer_product_name': customerProductName ?? ''
+    });
+    
+    if (variants != null) request.fields['variants'] = variants;
+
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      request.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
+
+    if (images50ml != null && images50ml.isNotEmpty) {
+      for (var img in images50ml) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('images_50ml[]', bytes, filename: img.name));
+      }
+    }
+
+    if (images100ml != null && images100ml.isNotEmpty) {
+      for (var img in images100ml) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('images_100ml[]', bytes, filename: img.name));
+      }
+    }
+
+    if (additionalImages != null && additionalImages.isNotEmpty) {
+      for (var img in additionalImages) {
+        final bytes = await img.readAsBytes();
+        request.files.add(http.MultipartFile.fromBytes('additional_images[]', bytes, filename: img.name));
+      }
+    }
+    
     final resp = await http.Response.fromStream(await request.send());
     if (resp.statusCode > 299) throw Exception(jsonDecode(resp.body)['message'] ?? 'Update Failed');
   }
@@ -116,7 +219,9 @@ class ApiService {
   Future<List<model.Banner>> fetchBanners({bool forceRefresh = false}) async {
     try {
       final response = await http.get(_u('/banners'), headers: _headers());
-      return _extract(response.body).map((j) => model.Banner.fromJson(j)).toList();
+      final banners = _extract(response.body).map((j) => model.Banner.fromJson(j)).toList();
+      if (banners.isNotEmpty) await _dbHelper.insertBanners(banners);
+      return banners;
     } catch (e) { return await _dbHelper.getBanners(); }
   }
   Future<List<model.Banner>> fetchBannersLocal() async => await _dbHelper.getBanners();
@@ -140,35 +245,54 @@ class ApiService {
     final req = http.MultipartRequest('POST', _u('/categories/add'));
     req.headers.addAll(_headers(token: token));
     req.fields['name'] = name;
-    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      req.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
     await req.send();
   }
+
   Future<void> deleteCategory({required dynamic id, String? token}) async => await http.post(_u('/categories/delete/$id'), headers: _headers(token: token));
+
   Future<List<dynamic>> fetchSubscribers() async {
     final res = await http.get(_u('/subscribers'), headers: _headers());
     return _extract(res.body);
   }
+
   Future<void> deleteSubscriber(dynamic id) async => await http.post(_u('/subscribers/delete/$id'), headers: _headers());
+
   Future<void> createBanner({required String title, String? description, String? targetScreen, String? targetId, int? sortOrder, bool isActive = true, dynamic imageFile, String? token}) async {
     final req = http.MultipartRequest('POST', _u('/banners/add'));
     req.headers.addAll(_headers(token: token));
     req.fields.addAll({'title': title, 'is_active': isActive ? '1' : '0'});
-    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      req.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
     await req.send();
   }
+
   Future<void> deleteBanner({required dynamic id, String? token}) async => await http.post(_u('/banners/delete/$id'), headers: _headers(token: token));
+
   Future<void> updateBanner({required dynamic id, required String title, String? description, String? targetScreen, String? targetId, int? sortOrder, bool isActive = true, String? currentImageUrl, dynamic imageFile, String? token}) async {
     final req = http.MultipartRequest('POST', _u('/banners/update/$id'));
     req.headers.addAll(_headers(token: token));
     req.fields.addAll({'title': title, 'is_active': isActive ? '1' : '0'});
-    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      req.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
     await req.send();
   }
+
   Future<void> updateCategory({required dynamic id, required String name, dynamic imageFile, String? token}) async {
     final req = http.MultipartRequest('POST', _u('/categories/update/$id'));
     req.headers.addAll(_headers(token: token));
     req.fields['name'] = name;
-    if (imageFile != null) req.files.add(await http.MultipartFile.fromPath('main_image', imageFile.path));
+    if (imageFile != null) {
+      final bytes = await imageFile.readAsBytes();
+      req.files.add(http.MultipartFile.fromBytes('main_image', bytes, filename: imageFile.name));
+    }
     await req.send();
   }
 }

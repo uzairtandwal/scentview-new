@@ -111,19 +111,19 @@ class _SearchResultsScreenState extends State<SearchResultsScreen> with SingleTi
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               itemCount: results.length,
               itemBuilder: (context, index) {
+                final product = results[index];
                 return Container(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: ProductCard(
-                    product: results[index],
+                    product: product,
                     isCompact: false,
-                    showFavorite: true,
                     showQuickAdd: true,
                     onTap: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (_) => ProductDetailScreen(
-                          product: results[index],
-                          allProducts: allData,
+                          product: product,
+                          allProducts: results,
                         ),
                       ),
                     ),

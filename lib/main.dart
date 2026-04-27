@@ -29,31 +29,22 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-
-    // 🔥 STEP 2: Token generate karne ka kaam yahan add kiya hai
     await _setupFCM();
-
-    runApp(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider(create: (_) => AuthService()),
-          ChangeNotifierProvider(create: (_) => OrdersService()),
-          ChangeNotifierProvider(create: (_) => CartService()),
-          ChangeNotifierProvider(create: (_) => CompareService()), // ✅ Added
-        ],
-        child: const ScentViewApp(),
-      ),
-    );
-
   } catch (e) {
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          body: Center(child: Text('Error: ${e.toString()}')),
-        ),
-      ),
-    );
+    debugPrint("Firebase initialization failed: $e");
   }
+
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProvider(create: (_) => OrdersService()),
+        ChangeNotifierProvider(create: (_) => CartService()),
+        ChangeNotifierProvider(create: (_) => CompareService()), 
+      ],
+      child: const ScentViewApp(),
+    ),
+  );
 }
 
 // 🔥 STEP 2 (NEW FUNCTION): Token nikaalne ka un-cut logic

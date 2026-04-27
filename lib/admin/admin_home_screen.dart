@@ -6,6 +6,7 @@ import 'package:scentview/services/orders_service.dart';
 import 'package:scentview/services/auth_service.dart';
 import 'package:scentview/models/product_model.dart';
 import 'package:scentview/models/category.dart' as app_category;
+import 'package:scentview/models/order.dart' as app_order;
 
 import 'package:scentview/admin/product_list_screen.dart';
 import 'package:scentview/admin/categories_screen.dart';
@@ -35,15 +36,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   static const Color _textDark = Color(0xFF1A1D2E);
   static const Color _textSub  = Color(0xFF9094A6);
 
-  // ── Dummy Orders ─────────────────────
-  final List<Map<String, dynamic>> _dummyOrders = [
-    {'id': '#1001', 'user': 'Ahmed Khan',    'product': 'Rose Perfume',   'rate': 'Rs 4500', 'address': 'Lahore, Punjab',   'status': 'Pending'},
-    {'id': '#1002', 'user': 'Sara Ali',      'product': 'Oud Musk',       'rate': 'Rs 7800', 'address': 'Karachi, Sindh',   'status': 'Completed'},
-    {'id': '#1003', 'user': 'Bilal Raza',    'product': 'Jasmine Essence','rate': 'Rs 3200', 'address': 'Islamabad',        'status': 'Pending'},
-    {'id': '#1004', 'user': 'Hina Shafiq',   'product': 'Amber Wood',     'rate': 'Rs 9500', 'address': 'Faisalabad',       'status': 'Cancelled'},
-    {'id': '#1005', 'user': 'Usman Tariq',   'product': 'Blue Ocean',     'rate': 'Rs 5500', 'address': 'Multan, Punjab',   'status': 'Completed'},
-  ];
-
   @override
   void initState() {
     super.initState();
@@ -55,7 +47,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
       _productsFuture    = _apiService.fetchProducts();
       _categoriesFuture  = _apiService.fetchCategories();
       _subscribersFuture = _apiService.fetchSubscribers();
-      Provider.of<OrdersService>(context, listen: false).fetchOrders();
+      Provider.of<OrdersService>(context, listen: false).fetchAdminOrders();
     });
   }
 
@@ -68,18 +60,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         const SnackBar(content: Text('Switched to Shop View'), backgroundColor: Color(0xFFFF6B9D)),
       );
     }
-  }
-
-  void _showComingSoon(BuildContext context, String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Coming Soon'),
-        content: Text('$feature jald aa raha hai!'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK', style: TextStyle(color: Color(0xFFFF6B9D))))],
-      ),
-    );
   }
 
   void _nav(BuildContext context, Widget screen) =>
@@ -146,7 +126,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                     _StatItem(title: 'Low Stock',      value: lowStockItems.toString(), icon: Icons.warning_amber_rounded, iconBg: const Color(0xFFFDEDED), iconColor: const Color(0xFFE74C3C), onTap: () {}),
                     _StatItem(title: 'Categories',      value: categories.length.toString(), icon: Icons.category_rounded,        iconBg: const Color(0xFFE6F9F0), iconColor: const Color(0xFF27AE60), onTap: () => _nav(context, const CategoriesScreen())),
                     _StatItem(title: 'Newsletter',      value: subscribers.length.toString(), icon: Icons.mark_email_read_rounded, iconBg: const Color(0xFFF3E5F5), iconColor: Colors.purple, onTap: () => _nav(context, const SubscribersScreen())),
-                    _StatItem(title: 'Total Orders',     value: ordersService.orders.isEmpty ? _dummyOrders.length.toString() : ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFE1F5FE), iconColor: Colors.lightBlue, onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
+                    _StatItem(title: 'Total Orders',     value: ordersService.orders.length.toString(), icon: Icons.receipt_long_rounded,    iconBg: const Color(0xFFE1F5FE), iconColor: Colors.lightBlue, onTap: () => Navigator.pushNamed(context, AdminOrdersDashboard.routeName)),
                   ];
 
                   return CustomScrollView(
@@ -161,7 +141,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                             crossAxisCount: 2,
                             crossAxisSpacing: 15,
                             mainAxisSpacing: 15,
-                            childAspectRatio: 1.0, // Ratio 1.0 means Square cards - more height
+                            childAspectRatio: 1.0, 
                           ),
                           delegate: SliverChildBuilderDelegate(
                             (context, i) => _buildStatCard(stats[i]),
@@ -215,7 +195,7 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                         ),
                       ),
 
-                      SliverToBoxAdapter(child: _buildOrdersTable()),
+                      SliverToBoxAdapter(child: _buildOrdersTable(ordersService.orders)),
 
                       const SliverToBoxAdapter(child: SizedBox(height: 40)),
                     ],
@@ -226,40 +206,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
           ),
         );
       },
-    );
-  }
-
-  // ─── Header ────────────────────────────────────────────
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(20, 20, 20, 20),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [Color(0xFFFF6B9D), Color(0xFFFF8FAB)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Hello Admin! 👋', style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500)),
-                const SizedBox(height: 4),
-                const Text('ScentView Overview', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 6),
-                Text('Manage your inventory and orders easily.', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(14)),
-            child: const Icon(Icons.insights_rounded, color: Colors.white, size: 32),
-          ),
-        ],
-      ),
     );
   }
 
@@ -282,7 +228,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
         ),
         child: Stack(
           children: [
-            // Decorative background circle
             Positioned(
               right: -10,
               top: -10,
@@ -297,9 +242,8 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center, // Content stays together in center
+              mainAxisAlignment: MainAxisAlignment.center, 
               children: [
-                // Icon Header
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
@@ -320,7 +264,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 2),
-                // Value
                 Text(
                   stat.value ?? '0',
                   style: TextStyle(
@@ -331,7 +274,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
                   overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: 8),
-                // Indicator Bar
                 Container(
                   height: 3,
                   width: 30,
@@ -413,7 +355,18 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 
   // ─── Orders Table ───────────────────────
-  Widget _buildOrdersTable() {
+  Widget _buildOrdersTable(List<app_order.Order> orders) {
+    if (orders.isEmpty) {
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(color: _white, borderRadius: BorderRadius.circular(16)),
+        child: const Center(child: Text('No recent orders')),
+      );
+    }
+    
+    final recentOrders = orders.take(5).toList();
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
       decoration: BoxDecoration(
@@ -435,25 +388,23 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
             columns: const [
               DataColumn(label: Text('Order ID')),
               DataColumn(label: Text('User')),
-              DataColumn(label: Text('Product')),
-              DataColumn(label: Text('Rate')),
+              DataColumn(label: Text('Amount')),
               DataColumn(label: Text('Address')),
               DataColumn(label: Text('Status')),
             ],
-            rows: _dummyOrders.map((order) {
-              final status = order['status'] as String;
-              final statusColor = status == 'Completed'
+            rows: recentOrders.map((order) {
+              final status = order.status;
+              final statusColor = status.toLowerCase() == 'completed'
                   ? const Color(0xFF27AE60)
-                  : status == 'Pending'
+                  : (status.toLowerCase() == 'pending' || status.toLowerCase() == 'placed')
                       ? const Color(0xFFF39C12)
                       : const Color(0xFFE74C3C);
 
               return DataRow(cells: [
-                DataCell(Text(order['id'],      style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(order['user'])),
-                DataCell(Text(order['product'])),
-                DataCell(Text(order['rate'],    style: const TextStyle(fontWeight: FontWeight.w600))),
-                DataCell(Text(order['address'])),
+                DataCell(Text('#${order.id}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(Text(order.customerName ?? 'Guest')),
+                DataCell(Text('Rs ${order.total.toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w600))),
+                DataCell(Text(order.shippingAddress)),
                 DataCell(
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -473,7 +424,6 @@ class _AdminHomeScreenState extends State<AdminHomeScreen> {
   }
 }
 
-// ─── Data Models ──────────────────────────────────────────────────
 class _StatItem {
   final String title;
   final String? value;
@@ -483,13 +433,4 @@ class _StatItem {
   final Color iconColor;
   final VoidCallback onTap;
   _StatItem({required this.title, this.value, this.future, required this.icon, required this.iconBg, required this.iconColor, required this.onTap});
-}
-
-class _ActionItem {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  _ActionItem({required this.title, required this.subtitle, required this.icon, required this.color, required this.onTap});
 }

@@ -8,22 +8,16 @@ class ProductCard extends StatelessWidget {
   final Product product;
   final bool isCompact;
   final VoidCallback onTap;
-  final bool showFavorite;
   final bool showQuickAdd;
-  final VoidCallback? onFavoriteTap;
   final VoidCallback? onQuickAddTap;
-  final bool isFavorite;
 
   const ProductCard({
     super.key,
     required this.product,
     required this.onTap,
     this.isCompact = false,
-    this.showFavorite = true,
     this.showQuickAdd = true,
-    this.onFavoriteTap,
     this.onQuickAddTap,
-    this.isFavorite = false,
   });
 
   bool get _isOutOfquantity => product.quantity == 0;
@@ -49,13 +43,9 @@ class ProductCard extends StatelessWidget {
           children: [
             // ── Image Area ──────────────────────────────────
             Expanded(
-              flex: isCompact ? 7 : 8,
               child: _ImageSection(
                 imageUrl: imageUrl,
                 isOutOfquantity: _isOutOfquantity,
-                showFavorite: showFavorite,
-                isFavorite: isFavorite,
-                onFavoriteTap: onFavoriteTap,
                 showQuickAdd: showQuickAdd && !_isOutOfquantity,
                 onQuickAddTap: onQuickAddTap,
               ),
@@ -80,18 +70,12 @@ class ProductCard extends StatelessWidget {
 class _ImageSection extends StatelessWidget {
   final String? imageUrl;
   final bool isOutOfquantity;
-  final bool showFavorite;
-  final bool isFavorite;
-  final VoidCallback? onFavoriteTap;
   final bool showQuickAdd;
   final VoidCallback? onQuickAddTap;
 
   const _ImageSection({
     required this.imageUrl,
     required this.isOutOfquantity,
-    required this.showFavorite,
-    required this.isFavorite,
-    required this.onFavoriteTap,
     required this.showQuickAdd,
     required this.onQuickAddTap,
   });
@@ -114,19 +98,6 @@ class _ImageSection extends StatelessWidget {
                   style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1),
                 ),
               ),
-            ),
-          ),
-        if (showFavorite && !isOutOfquantity)
-          Positioned(
-            top: 8,
-            right: 8,
-            child: IconButton(
-              icon: Icon(
-                isFavorite ? Icons.favorite : Icons.favorite_border,
-                color: isFavorite ? Colors.black : Colors.black45,
-                size: 20,
-              ),
-              onPressed: onFavoriteTap,
             ),
           ),
         if (showQuickAdd && onQuickAddTap != null)

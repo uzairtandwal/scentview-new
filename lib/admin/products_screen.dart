@@ -680,22 +680,24 @@ class _ProductsScreenState extends State<ProductsScreen> {
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   color: Theme.of(context).colorScheme.surfaceVariant,
-                  image: product.imageUrl.isNotEmpty
-                      ? DecorationImage(
-                          image: NetworkImage(ApiService.toAbsoluteUrl(product.imageUrl)!),
-                          fit: BoxFit.cover,
-                        )
-                      : null,
+                  border: Border.all(color: Colors.grey.withOpacity(0.2)),
                 ),
-                child: product.imageUrl.isEmpty
-                    ? Center(
-                        child: Icon(
-                          Icons.shopping_bag_outlined,
-                          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
-                          size: 28,
-                        ),
-                      )
-                    : null,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: product.imageUrl.isNotEmpty
+                      ? Image.network(
+                          ApiService.toAbsoluteUrl(product.imageUrl)!,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2)));
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(child: Icon(Icons.broken_image, size: 20, color: Colors.grey));
+                          },
+                        )
+                      : const Center(child: Icon(Icons.shopping_bag_outlined, size: 28, color: Colors.grey)),
+                ),
               ),
               title: Text(
                 product.name,

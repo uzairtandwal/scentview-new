@@ -52,6 +52,40 @@ class OrdersService with ChangeNotifier {
     }
   }
 
+  // ✅ Admin ke liye saaray orders fetch karna
+  Future<void> fetchAdminOrders() async {
+    final token = ApiService.authToken;
+    if (token == null) return;
+
+    try {
+      final res = await http.get(
+        Uri.parse('$_baseUrl/admin/orders'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body);
+        List<dynamic> list = [];
+        
+        if (decoded is Map && decoded.containsKey('data')) {
+          list = decoded['data'] ?? [];
+        } else if (decoded is List) {
+          list = decoded;
+        }
+        
+        _orders.clear();
+        _orders.addAll(list.map((e) => Order.fromJson(Map<String, dynamic>.from(e))));
+        notifyListeners();
+        _save(); 
+      }
+    } catch (e) {
+      if (kDebugMode) print('Fetch Admin Orders Error: $e');
+    }
+  }
+
   Future<Order?> placeOrder(Map<String, dynamic> orderData, String idempotencyKey) async {
     if (kDebugMode) print('------------------------------------------');
     if (kDebugMode) print('🔥 ORDERS_SERVICE: placeOrder STARTING!');

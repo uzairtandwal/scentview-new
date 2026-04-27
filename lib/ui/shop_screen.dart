@@ -253,7 +253,6 @@ class _ShopScreenState extends State<ShopScreen> {
                                       (_, i) => ProductCard(
                                         product: products[i],
                                         isCompact: false,
-                                        showFavorite: true,
                                         showQuickAdd: true,
                                         onTap: () => Navigator.push(
                                           context,

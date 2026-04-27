@@ -11,6 +11,7 @@ import '../models/category.dart';
 import '../services/api_service.dart';
 import 'widgets/banner_carousel.dart';
 import 'widgets/custom_app_bar.dart';
+import 'widgets/category_card.dart';
 import 'widgets/product_card.dart';
 import 'widgets/product_shimmer.dart';
 import 'product_detail_screen.dart';
@@ -288,7 +289,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ),
                                 ),
                               ),
-                              showFavorite: true,
                               showQuickAdd: true,
                             ),
                             childCount: _filteredProducts.length > 6 ? 6 : _filteredProducts.length,
@@ -341,33 +341,31 @@ class _CategoryList extends StatelessWidget {
     required this.categories, required this.selectedId, required this.onSelect,
   });
 
+  IconData _getIcon(String name) {
+    name = name.toLowerCase();
+    if (name.contains('female') || name.contains('women') || name.contains('woman')) return Icons.woman;
+    if (name.contains('male') || name.contains('men') || name.contains('man')) return Icons.man;
+    if (name.contains('unisex') || name.contains('group')) return Icons.groups;
+    return Iconsax.category;
+  }
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 46,
+      height: 120,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final isSelected = selectedId == categories[i].id;
           final label      = categories[i].name;
-          return GestureDetector(
+          return CategoryCard(
+            title: label,
+            icon: _getIcon(label),
+            isSelected: isSelected,
             onTap: () => onSelect(categories[i].id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? AppTheme.primaryColor : Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: isSelected ? AppTheme.primaryColor : AppTheme.secondaryColor.withOpacity(0.2)),
-              ),
-              child: Text(label.toUpperCase(), style: TextStyle(
-                color: isSelected ? Colors.white : AppTheme.secondaryColor,
-                fontWeight: FontWeight.w600, fontSize: 13,
-              )),
-            ),
           );
         },
       ),

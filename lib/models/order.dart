@@ -48,6 +48,8 @@ class Order {
   final String status; 
   final String paymentMethod;
   final String shippingAddress;
+  final String? customerName;
+  final String? phoneNumber;
 
   Order({
     required this.id,
@@ -57,6 +59,8 @@ class Order {
     this.status = 'Placed',
     required this.paymentMethod,
     required this.shippingAddress,
+    this.customerName,
+    this.phoneNumber,
   });
 
   Map<String, dynamic> toJson() => {
@@ -67,6 +71,8 @@ class Order {
     'status': status,
     'paymentMethod': paymentMethod,
     'shippingAddress': shippingAddress,
+    'customerName': customerName,
+    'phoneNumber': phoneNumber,
   };
 
   factory Order.fromJson(Map<String, dynamic> json) => Order(
@@ -80,5 +86,7 @@ class Order {
     status: json['status'] as String? ?? 'Placed',
     paymentMethod: json['payment_method'] ?? json['paymentMethod'] ?? 'COD',
     shippingAddress: json['shipping_address'] ?? json['shippingAddress'] ?? 'No Address',
+    customerName: json['customer_name'] ?? json['customerName'],
+    phoneNumber: json['phone_number'] ?? json['phoneNumber'],
   );
 }

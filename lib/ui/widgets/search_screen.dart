@@ -41,13 +41,13 @@ class _SearchScreenState extends State<SearchScreen>
   // ── Categories ───────────────────────────────────────────────
   final List<Map<String, dynamic>> _categories = [
     {'label': 'All', 'icon': Iconsax.category},
-    {'label': 'Floral', 'icon': Iconsax.heart},
+    {'label': 'Floral', 'icon': Iconsax.sun_1},
     {'label': 'Woody', 'icon': Iconsax.tree},
     {'label': 'Fresh', 'icon': Iconsax.wind_2},
     {'label': 'Oriental', 'icon': Iconsax.star},
     {'label': 'Citrus', 'icon': Iconsax.sun_1},
     {'label': 'Aquatic', 'icon': Iconsax.drop},
-    {'label': 'Gourmand', 'icon': Iconsax.heart},
+    {'label': 'Gourmand', 'icon': Iconsax.cup},
   ];
 
   final List<String> _sortOptions = [
@@ -1174,34 +1174,6 @@ class _ProductCardState extends State<_ProductCard>
                                 fontWeight: FontWeight.w800)),
                       ),
                     ),
-                  // Wishlist
-                  Positioned(
-                    top: 8, right: 8,
-                    child: GestureDetector(
-                      onTap: () =>
-                          setState(() => _isWishlisted = !_isWishlisted),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: _isWishlisted
-                              ? Colors.red.shade50
-                              : Colors.white,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 6)
-                          ],
-                        ),
-                        child: Icon(
-                          _isWishlisted ? Iconsax.heart5 : Iconsax.heart,
-                          size: 16,
-                          color: _isWishlisted ? Colors.red : Colors.grey,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
 

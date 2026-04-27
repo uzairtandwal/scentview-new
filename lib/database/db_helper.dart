@@ -18,7 +18,7 @@ class DBHelper {
     String path = join(await getDatabasesPath(), 'scentview.db');
     return await openDatabase(
       path,
-      version: 8, // Incremented version to add slug column to categories
+      version: 9, // Incremented version to add missing product columns
       onCreate: (db, version) async {
         await _createProductTable(db);
         await _createBannerTable(db);
@@ -46,6 +46,11 @@ class DBHelper {
           await db.execute('DROP TABLE IF EXISTS categories');
           await _createCategoryTable(db);
         }
+        if (oldVersion < 9) {
+          // Add missing columns to products table
+          await db.execute('DROP TABLE IF EXISTS products');
+          await _createProductTable(db);
+        }
       },
     );
   }
@@ -61,17 +66,28 @@ class DBHelper {
         price REAL,
         sale_price REAL,
         image_url TEXT,
+        image_url_100ml TEXT,
         images_json TEXT,
+        images_50ml_json TEXT,
+        images_100ml_json TEXT,
+        variants_json TEXT,
         category TEXT,
         scent_family TEXT,
         brand TEXT,
         size TEXT,
         quantity INTEGER,
+        price_100ml REAL,
+        quantity_100ml INTEGER,
         notes_top TEXT,
         notes_middle TEXT,
         notes_base TEXT,
         is_featured INTEGER,
-        tags_json TEXT
+        is_slider INTEGER,
+        badge_text TEXT,
+        sku TEXT,
+        is_active INTEGER,
+        tags_json TEXT,
+        customer_product_name TEXT
       )
     ''');
   }

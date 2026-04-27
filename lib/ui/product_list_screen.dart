@@ -79,8 +79,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
                 final product = products[index];
                 return ProductCard(
                   product: product,
-                  isCompact: false,
-                  isFavorite: _favoriteIds.contains(product.id),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(
@@ -90,8 +88,6 @@ class _ProductListScreenState extends State<ProductListScreen> {
                       ),
                     ),
                   ),
-                  showFavorite: true,
-                  onFavoriteTap: () => _toggleFavorite(product),
                   showQuickAdd: true,
                   onQuickAddTap: () => _addToCart(product),
                 );
