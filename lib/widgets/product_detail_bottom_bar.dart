@@ -153,18 +153,18 @@ class _WhatsAppButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: _green.withValues(alpha: 0.1),
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.zero,
         child: Container(
-          width: 52,
-          height: 52,
+          width: 60,
+          height: 60,
           alignment: Alignment.center,
           child: const FaIcon(
             FontAwesomeIcons.whatsapp,
             color: _green,
-            size: 24,
+            size: 30,
           ),
         ),
       ),
@@ -192,14 +192,14 @@ class _OutlineButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.zero,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.zero,
         child: Container(
-          height: 52,
+          height: 60,
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.zero,
             border: Border.all(
               color: color.withValues(alpha: 0.6),
               width: 1.5,
@@ -208,8 +208,8 @@ class _OutlineButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(width: 6),
+              Icon(icon, color: color, size: 24),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   label,
@@ -247,21 +247,21 @@ class _FilledButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Material(
       color: color,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.zero,
       elevation: 0,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.zero,
         highlightColor: Colors.white.withValues(alpha: 0.15),
         splashColor: Colors.white.withValues(alpha: 0.2),
         child: Container(
-          height: 52,
+          height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, color: Colors.white, size: 18),
-              const SizedBox(width: 6),
+              Icon(icon, color: Colors.white, size: 24),
+              const SizedBox(width: 8),
               Flexible(
                 child: Text(
                   label,
@@ -278,7 +278,7 @@ class _FilledButton extends StatelessWidget {
               const Icon(
                 Icons.arrow_forward_rounded,
                 color: Colors.white,
-                size: 16,
+                size: 20,
               ),
             ],
           ),

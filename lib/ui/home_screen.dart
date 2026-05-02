@@ -255,6 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   SliverToBoxAdapter(
                     child: _CategoryList(
                       categories: _categories,
+                      products: _allProducts,
                       selectedId: _selectedCategoryId,
                       onSelect: _filterByCategory,
                     ),
@@ -334,11 +335,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _CategoryList extends StatelessWidget {
   final List<Category> categories;
+  final List<Product> products;
   final String? selectedId;
   final ValueChanged<String?> onSelect;
 
   const _CategoryList({
-    required this.categories, required this.selectedId, required this.onSelect,
+    required this.categories,
+    required this.products,
+    required this.selectedId,
+    required this.onSelect,
   });
 
   IconData _getIcon(String name) {
@@ -349,23 +354,46 @@ class _CategoryList extends StatelessWidget {
     return Iconsax.category;
   }
 
+  int _getCount(String categoryName) {
+    return products.where((p) => p.category?.toLowerCase() == categoryName.toLowerCase()).length;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 120,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 12),
+    // Only show Male, Female, Unisex as requested
+    final filteredCats = categories.where((c) {
+      final n = c.name.toLowerCase();
+      return n == 'male' || n == 'female' || n == 'unisex';
+    }).toList();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: filteredCats.length,
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 3,
+          crossAxisSpacing: 10,
+          mainAxisSpacing: 10,
+          childAspectRatio: 0.82,
+        ),
         itemBuilder: (context, i) {
-          final isSelected = selectedId == categories[i].id;
-          final label      = categories[i].name;
+          final cat = filteredCats[i];
+          final isSelected = selectedId == cat.id;
+          final count = _getCount(cat.name);
+          
+          String displayTitle = cat.name;
+          if (displayTitle.toLowerCase() == 'male') displayTitle = "Men's";
+          if (displayTitle.toLowerCase() == 'female') displayTitle = "Women's";
+          if (displayTitle.toLowerCase() == 'unisex') displayTitle = "Unisex";
+
           return CategoryCard(
-            title: label,
-            icon: _getIcon(label),
+            title: displayTitle,
+            icon: _getIcon(cat.name),
             isSelected: isSelected,
-            onTap: () => onSelect(categories[i].id),
+            productCount: count,
+            onTap: () => onSelect(cat.id),
           );
         },
       ),
@@ -387,38 +415,52 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(20, 32, 20, 16),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryColor.withOpacity(0.05),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: AppTheme.primaryColor, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title.toUpperCase(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primaryColor, height: 1.1)),
-                if (subtitle.isNotEmpty)
-                  Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.secondaryColor)),
-              ],
+          Text(
+            title.toUpperCase(),
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.primaryColor,
+              letterSpacing: 1.5,
+              height: 1.1,
             ),
           ),
+          if (subtitle.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppTheme.secondaryColor,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ],
           if (showViewAll && onViewAll != null)
-            TextButton(
-              onPressed: onViewAll,
-              child: const Row(mainAxisSize: MainAxisSize.min, children: [
-                Text('View All', style: TextStyle(color: AppTheme.primaryColor, fontSize: 12, fontWeight: FontWeight.w700)),
-                SizedBox(width: 2),
-                Icon(Icons.arrow_forward_ios_rounded, color: AppTheme.primaryColor, size: 10),
-              ]),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: TextButton(
+                onPressed: onViewAll,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('View All',
+                        style: TextStyle(
+                            color: AppTheme.primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700)),
+                    SizedBox(width: 2),
+                    Icon(Icons.arrow_forward_ios_rounded,
+                        color: AppTheme.primaryColor, size: 10),
+                  ],
+                ),
+              ),
             ),
         ],
       ),
